@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+functions/lib/
+
+# Environment files — NEVER commit these
+.env.local
+.env.production
+functions/.env
+functions/service-account.json
+
+# Build outputs
+dist/
+build/
+
+# Vite
+.vite/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

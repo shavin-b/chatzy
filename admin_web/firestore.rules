@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ================================================================
+    // Helper functions
+    // ================================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getAdminData() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        getAdminData().role in ['Super Admin', 'Admin', 'Support'];
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() &&
+        getAdminData().role == 'Super Admin';
+    }
+
+    // Check if the request is from the device itself
+    // Devices do NOT use Firebase Auth — they write with unauthenticated access.
+    // We rely on the device writing only to its own document.
+    // NOTE: Tightening device writes requires Firebase Auth on the Android client.
+    // Current Android client is unauthenticated. Keeping existing open rules for devices.
+    function isDeviceWrite() {
+      return true; // Preserved from original rules — Android client is unauthenticated
+    }
+
+    // ================================================================
+    // Admins Collection
+    // admins/{adminId} — Admin user profiles + roles
+    // ================================================================
+    match /admins/{adminId} {
+      // Any signed-in user can read (to check their own role)
+      allow read: if isSignedIn();
+      // Only Super Admin can create/modify/delete admin accounts
+      allow write: if isSuperAdmin();
+    }
+
+    // ================================================================
+    // Devices Collection
+    // devices/{deviceId} — Client app registrations + heartbeats
+    // ================================================================
+    match /devices/{deviceId} {
+      // Read: Admin users OR unauthenticated (Android client heartbeat sync)
+      allow read: if true;
+
+      // Create: Unauthenticated (Android client initial registration)
+      // Update: Unauthenticated (Android heartbeat + FCM token sync) OR Admin
+      // IMPORTANT: Admin subscription updates only touch subscription fields.
+      // Admin lock state (admin_locked) is stored on Android SharedPrefs, NOT in Firestore.
+      allow create, update: if true;
+
+      // Delete: Super Admin only
+      allow delete: if isSuperAdmin();
+    }
+
+    // ================================================================
+    // DeviceCommands Collection
+    // deviceCommands/{commandId} — FCM command records + acknowledgements
+    // ================================================================
+    match /deviceCommands/{commandId} {
+      // Admin: full read
+      allow read: if isAdmin();
+
+      // Create: Only via Cloud Functions (server-side). 
+      // We allow create from authenticated admins too (defense in depth).
+      // Actual FCM send always goes through Cloud Functions.
+      allow create: if isAdmin();
+
+      // Update: Android client writes acknowledgement (status: SUCCESS/FAILED, processedAt).
+      // Unauthenticated write allowed for Android client compatibility.
+      // The Android client only updates its OWN command documents (by commandId it received).
+      allow update: if true;
+
+      // Delete: Not allowed (immutable command history)
+      allow delete: if false;
+    }
+
+    // ================================================================
+    // Subscriptions Collection
+    // subscriptions/{subscriptionId} — Subscription change history
+    // ================================================================
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // ================================================================
+    // Logs Collection
+    // logs/{logId} — Audit trail (immutable)
+    // ================================================================
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      // Create is open for system/Cloud Function writes
+      allow create: if true;
+      // Logs are immutable — no updates or deletes
+      allow update, delete: if false;
+    }
+
+    // ================================================================
+    // Notifications Collection
+    // notifications/{notificationId} — FCM broadcast history
+    // ================================================================
+    match /notifications/{notificationId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // ================================================================
+    // Settings Collection
+    // settings/global — Global configuration
+    // ================================================================
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+  }
+}

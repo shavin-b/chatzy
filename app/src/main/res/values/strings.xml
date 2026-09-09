@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">OrderFlow AutoResponder</string>
+    <string name="dashboard_title">OrderFlow Automation</string>
+    <string name="rules_title">Auto-Reply Rules</string>
+    <string name="logs_title">Message Logs</string>
+    <string name="customers_title">Customer Profiles</string>
+    <string name="settings_title">Meta Cloud API Settings</string>
+</resources>

@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for Admin Authentication & Role check
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+        (get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['Super Admin', 'Admin', 'Support']);
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'Super Admin';
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // Installed Client Devices Collection
+    match /devices/{deviceId} {
+      allow read: if true; // Client apps sync heartbeats, Admins read all
+      allow create, update: if true; // Client app registers & updates heartbeat, Admin updates subscription
+      allow delete: if isSuperAdmin();
+    }
+
+    // Subscriptions Collection
+    match /subscriptions/{subscriptionId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Audit Logs Collection
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if true;
+      allow update, delete: if false; // Immutable audit log
+    }
+
+    // Push Notifications Collection
+    match /notifications/{notificationId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Admin Settings Collection
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+  }
+}
