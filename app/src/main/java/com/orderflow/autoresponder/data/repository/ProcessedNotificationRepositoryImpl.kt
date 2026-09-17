@@ -21,6 +21,10 @@ class ProcessedNotificationRepositoryImpl @Inject constructor(
         return dao.getNotification(fingerprint) != null
     }
 
+    override suspend fun findDuplicate(sender: String, message: String, since: Long): ProcessedNotificationEntity? {
+        return dao.findDuplicate(sender, message, since)
+    }
+
     override suspend fun clearOldNotifications(days: Int) {
         val cutoff = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
         dao.clearOldNotifications(cutoff)

@@ -53,4 +53,13 @@ object MessageFingerprintGenerator {
             input.hashCode().toString()
         }
     }
+
+    /**
+     * Normalizes text by trimming, collapsing multiple spaces, and converting to lowercase.
+     */
+    fun normalize(text: String): String {
+        return text.trim()
+            .replace("\\s+".toRegex(), " ")
+            .lowercase()
+    }
 }

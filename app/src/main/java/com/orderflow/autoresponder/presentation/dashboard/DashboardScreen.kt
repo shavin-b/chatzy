@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.People
@@ -29,14 +30,18 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.orderflow.autoresponder.R
 import com.orderflow.autoresponder.presentation.components.AppTopBar
 import com.orderflow.autoresponder.presentation.theme.BrandAccent
 import com.orderflow.autoresponder.presentation.theme.BrandCardDark
@@ -56,9 +61,23 @@ fun DashboardScreen(
     onNavigateToDiagnostics: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val uriHandler = LocalUriHandler.current
+
+    // Refresh dashboard data (and permission status) whenever the user returns to this screen
+    LaunchedEffect(Unit) {
+        viewModel.loadDashboardData()
+    }
 
     Scaffold(
-        topBar = { AppTopBar(title = "OrderFlow Automation") },
+        topBar = { 
+            AppTopBar(
+                title = stringResource(R.string.dashboard_title),
+                actionIcon = Icons.AutoMirrored.Filled.HelpOutline,
+                onActionClick = {
+                    uriHandler.openUri("https://gemini.google.com/share/d/12KS_GTgc4qC2B7qaxQkW5W5Jr4RIPFPr?usp=sharing")
+                }
+            ) 
+        },
         containerColor = BrandDarkBackground
     ) { padding ->
         Column(

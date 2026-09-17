@@ -36,28 +36,30 @@ fun OnboardingScreen(viewModel: OnboardingViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(24.dp)
+                .imePadding()
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
+            Spacer(modifier = Modifier.height(60.dp))
             Icon(
                 painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = null,
                 modifier = Modifier.size(100.dp),
-                tint = BrandGreen
+                tint = Color.Unspecified // Preserve vector colors
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Welcome to OrderFlow",
+                text = "Welcome",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = BrandTextPrimary
             )
 
             Text(
-                text = "Set up your WhatsApp Business information to continue.",
+                text = "Set up your information to continue.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = BrandTextSecondary,
                 textAlign = TextAlign.Center,

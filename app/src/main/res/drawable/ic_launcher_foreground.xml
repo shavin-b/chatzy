@@ -4,7 +4,12 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Gold/Yellow Border -->
     <path
-        android:fillColor="#00A884"
-        android:pathData="M54,24C37.4,24 24,37.4 24,54C24,60.2 25.9,66 29.2,70.8L25,86L40.6,81.9C45.2,84.7 50.6,86.3 56.4,86.3C73,86.3 86.4,72.9 86.4,56.3C86.4,39.7 73,24 54,24Z"/>
+        android:fillColor="#FFC107"
+        android:pathData="M54,24C37.4,24 24,37.4 24,54C24,60.2 25.9,66 29.2,70.8L25,86L40.6,81.9C45.2,84.7 50.6,86.3 56.4,86.3C73,86.3 86.4,72.9 86.4,56.3C86.4,39.7 73,24 54,24Z" />
+    <!-- Red Fill -->
+    <path
+        android:fillColor="#D32F2F"
+        android:pathData="M54,28C39.5,28 28,39.5 28,54C28,59.3 29.6,64.2 32.3,68.4L28.8,81.3L42.1,77.8C46.1,80 50.8,82.3 56,82.3C70.5,82.3 82.4,70.5 82.4,56C82.4,41.5 70.5,28 54,28Z" />
 </vector>

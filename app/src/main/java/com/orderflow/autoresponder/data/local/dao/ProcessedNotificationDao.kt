@@ -14,6 +14,9 @@ interface ProcessedNotificationDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNotification(notification: ProcessedNotificationEntity)
 
+    @Query("SELECT * FROM processed_notifications WHERE sender = :sender AND message = :normalizedMessage AND timestamp > :since LIMIT 1")
+    suspend fun findDuplicate(sender: String, normalizedMessage: String, since: Long): ProcessedNotificationEntity?
+
     @Query("DELETE FROM processed_notifications WHERE processedAt < :timestamp")
     suspend fun clearOldNotifications(timestamp: Long)
 }

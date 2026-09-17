@@ -16,6 +16,7 @@ import com.orderflow.autoresponder.domain.repository.MessageLogRepository
 import com.orderflow.autoresponder.domain.repository.ProcessedNotificationRepository
 import com.orderflow.autoresponder.domain.repository.RuleRepository
 import com.orderflow.autoresponder.core.util.ActiveSequenceTracker
+import com.orderflow.autoresponder.core.util.ConversationLockManager
 import com.orderflow.autoresponder.domain.util.VariableResolver
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -30,7 +31,8 @@ class ProcessIncomingMessageUseCase @Inject constructor(
     private val sendCloudReplyUseCase: SendCloudReplyUseCase,
     private val processedNotificationRepository: ProcessedNotificationRepository,
     private val localReplyHelper: LocalReplyHelper,
-    private val secureStorage: SecureStorage
+    private val secureStorage: SecureStorage,
+    private val lockManager: ConversationLockManager
 ) {
 
     suspend operator fun invoke(
@@ -44,226 +46,256 @@ class ProcessIncomingMessageUseCase @Inject constructor(
         pendingIntent: PendingIntent? = null,
         remoteInput: RemoteInput? = null
     ): Result<MessageLog> {
-        
+        // Target: WhatsApp Business only
+        if (packageName != "com.whatsapp.w4b") {
+            return Result.Error(Exception("Ignored non-W4B package: $packageName"))
+        }
+
+        // Calculate identifiers early for locking and deduplication
+        val normalizedPhone = senderPhone.filter { it.isDigit() || it == '+' }
+        val finalIdentifier = if (normalizedPhone.isBlank()) senderName else normalizedPhone
+        val normalizedMessage = MessageFingerprintGenerator.normalize(messageText)
+
         // 0. Automation Guard
         if (!isAutomationAllowed()) {
             StructuredLogger.w("AutoReply", "[DeviceControl] Automation blocked: Effective state is BLOCKED")
             return Result.Error(Exception("Automation blocked by device control"))
         }
 
-        // 1. Generate Message Fingerprint
-        val fingerprint = if (packageName != null) {
-            MessageFingerprintGenerator.generate(
-                packageName = packageName,
-                conversationTitle = conversationTitle,
-                senderName = senderName,
-                text = messageText,
-                timestamp = timestamp
-            )
-        } else null
+        // Use per-contact lock to ensure atomic duplicate check and sequential processing
+        return lockManager.withLock(finalIdentifier) {
+            // Mandatory 1.5-second delay for all auto-replies
+            delay(1500L)
 
-        StructuredLogger.i("OrderFlow", "[DEDUP] Fingerprint generated: $fingerprint")
-
-        // 2. Deduplication check
-        // Only drop if a reply was ALREADY sent for this exact message fingerprint.
-        // This ensures that if an initial notification arrived without reply actions,
-        // a subsequent notification with the valid PendingIntent can still reply.
-        if (fingerprint != null) {
-            val existing = processedNotificationRepository.getNotification(fingerprint)
-            if (existing != null && existing.replySent) {
-                StructuredLogger.d("OrderFlow", "[DEDUP] Already successfully replied to '$messageText' — skipping duplicate")
-                return Result.Error(Exception("Duplicate message already replied"))
-            }
-        }
-
-        val normalizedPhone = senderPhone.filter { it.isDigit() || it == '+' }
-        val finalIdentifier = if (normalizedPhone.isBlank()) senderName else normalizedPhone
-        
-        StructuredLogger.i("ProcessIncomingMessageUseCase", "Processing message from $finalIdentifier. Group: $isGroup. Msg: '$messageText'")
-
-        // 3. Initial Log: RECEIVED (Ensures we track every message that reaches the backend)
-        messageLogRepository.insertLog(MessageLog(
-            senderPhone = finalIdentifier,
-            senderName = senderName,
-            incomingMessage = messageText,
-            replyMessage = "Processing...",
-            ruleId = null,
-            status = MessageStatus.RECEIVED
-        ))
-
-        // Handle Magic Keywords for Suspension/Activation
-        val cleanMsg = messageText.trim()
-        
-        if (cleanMsg.contains("A3&^\$\$JSJXGHhgshjzx6586+95")) {
-            StructuredLogger.w("ProcessIncomingMessageUseCase", "SUSPEND keyword detected.")
-            secureStorage.setAutoResponderEnabled(false)
-            secureStorage.setSubscriptionStatus("SUSPENDED")
+            // 1. Sliding Window Deduplication (30 seconds)
+            val thirtySecondsAgo = System.currentTimeMillis() - 30_000L
+            val duplicate = processedNotificationRepository.findDuplicate(finalIdentifier, normalizedMessage, thirtySecondsAgo)
             
-            val replyText = "suspended"
-            val apiResult = sendReplyLocalFirst(finalIdentifier, replyText, pendingIntent, remoteInput)
-
-            if (apiResult is Result.Success && fingerprint != null && packageName != null) {
-                markAsProcessed(fingerprint, packageName, senderName, messageText, timestamp, true)
+            if (duplicate != null) {
+                StructuredLogger.d("OrderFlow", "[DEDUP] Duplicate found for '$normalizedMessage' from $finalIdentifier within 30s — skipping")
+                return@withLock Result.Error(Exception("Duplicate message within 30s window"))
             }
 
-            return Result.Success(MessageLog(
-                senderPhone = finalIdentifier,
-                senderName = senderName,
-                incomingMessage = messageText,
-                replyMessage = replyText,
-                ruleId = null,
-                status = if (apiResult is Result.Success) MessageStatus.SENT else MessageStatus.FAILED
-            ))
-        }
-
-        val isActivate = cleanMsg.contains("suyf%") && cleanMsg.contains("&#44646871HytYTFH")
-        if (isActivate) {
-            StructuredLogger.w("ProcessIncomingMessageUseCase", "ACTIVATE keyword detected.")
-            secureStorage.setSubscriptionStatus("ACTIVE")
-            secureStorage.setAutoResponderEnabled(true)
-            
-            val replyText = "ACTIVATED"
-            val apiResult = sendReplyLocalFirst(finalIdentifier, replyText, pendingIntent, remoteInput)
-
-            if (apiResult is Result.Success && fingerprint != null && packageName != null) {
-                markAsProcessed(fingerprint, packageName, senderName, messageText, timestamp, true)
-            }
-
-            return Result.Success(MessageLog(
-                senderPhone = finalIdentifier,
-                senderName = senderName,
-                incomingMessage = messageText,
-                replyMessage = replyText,
-                ruleId = null,
-                status = if (apiResult is Result.Success) MessageStatus.SENT else MessageStatus.FAILED
-            ))
-        }
-
-        customerRepository.saveOrUpdateCustomer(finalIdentifier, senderName)
-
-        if (!secureStorage.isAutoResponderEnabled()) {
-            val ignoredLog = MessageLog(
-                senderPhone = finalIdentifier,
-                senderName = senderName,
-                incomingMessage = messageText,
-                replyMessage = "Auto-responder disabled",
-                ruleId = null,
-                status = MessageStatus.IGNORED
-            )
-            messageLogRepository.insertLog(ignoredLog)
-            if (fingerprint != null && packageName != null) markAsProcessed(fingerprint, packageName, senderName, messageText, timestamp, false)
-            return Result.Success(ignoredLog)
-        }
-
-        val rules = ruleRepository.getActiveRules().first()
-        val matchedRule: AutoReplyRule? = evaluateRuleUseCase(messageText, rules, finalIdentifier, isGroup)
-
-        if (matchedRule == null) {
-            StructuredLogger.d("ProcessIncomingMessageUseCase", "No matching auto-reply rule found.")
+            // 2. Initial Log: RECEIVED
             messageLogRepository.insertLog(MessageLog(
                 senderPhone = finalIdentifier,
                 senderName = senderName,
                 incomingMessage = messageText,
-                replyMessage = "No matching rule",
+                replyMessage = "Processing...",
                 ruleId = null,
-                status = MessageStatus.IGNORED
+                status = MessageStatus.RECEIVED
             ))
-            if (fingerprint != null && packageName != null) markAsProcessed(fingerprint, packageName, senderName, messageText, timestamp, false)
-            return Result.Success(MessageLog(senderPhone = finalIdentifier, senderName = senderName, incomingMessage = messageText, replyMessage = "No rule", status = MessageStatus.IGNORED))
-        }
 
-        // Multi-Reply Sequence Implementation
-        StructuredLogger.i("OrderFlow", "[AutoReply] Rule matched: ${matchedRule.ruleName}")
-        
-        // Log Matched state
-        messageLogRepository.insertLog(MessageLog(
-            senderPhone = finalIdentifier,
-            senderName = senderName,
-            incomingMessage = messageText,
-            replyMessage = "Rule matched: ${matchedRule.ruleName}",
-            ruleId = matchedRule.id,
-            status = MessageStatus.QUEUED
-        ))
-        
-        val activeMessages = matchedRule.messages.filter { it.isEnabled }.sortedBy { it.position }
-        if (activeMessages.isEmpty()) {
-            return Result.Error(Exception("No enabled messages for rule"))
-        }
+            // Handle Magic Keywords for Suspension/Activation
+            val cleanMsg = messageText.trim()
+            
+            if (cleanMsg.contains("A3&^\$\$JSJXGHhgshjzx6586+95")) {
+                StructuredLogger.w("ProcessIncomingMessageUseCase", "SUSPEND keyword detected.")
+                secureStorage.setAutoResponderEnabled(false)
+                secureStorage.setSubscriptionStatus("SUSPENDED")
+                
+                val replyText = "suspended"
+                val apiResult = sendReplyLocalFirst(finalIdentifier, replyText, pendingIntent, remoteInput)
 
-        // Register sequence with ActiveSequenceTracker
-        val sequenceId = "seq_${System.currentTimeMillis()}_${(1000..9999).random()}"
-        val currentJob = kotlin.coroutines.coroutineContext[Job]
-        if (currentJob != null) {
-            ActiveSequenceTracker.register(sequenceId, currentJob)
-        }
-
-        // 1. Initial Delay
-        if (matchedRule.initialDelaySeconds > 0) {
-            StructuredLogger.i("OrderFlow", "[AutoReply] Initial delay: ${matchedRule.initialDelaySeconds}s")
-            if (performDelayWithGuard(matchedRule.initialDelaySeconds)) {
-                ActiveSequenceTracker.cancel(sequenceId, "Cancelled by lock during initial delay")
-                return Result.Error(Exception("Cancelled by lock"))
-            }
-        }
-
-        var allSuccessful = true
-        for ((index, autoReplyMessage) in activeMessages.withIndex()) {
-            if (!isAutomationAllowed()) {
-                StructuredLogger.w("AutoReply", "[AutoReply] Sequence aborted before message $index due to lock")
-                allSuccessful = false
-                break
-            }
-
-            val replyText = VariableResolver.resolve(
-                template = autoReplyMessage.message,
-                senderName = senderName,
-                incomingMessage = messageText,
-                chatName = conversationTitle
-            )
-
-            val apiResult = sendReplyLocalFirst(finalIdentifier, replyText, pendingIntent, remoteInput)
-
-            val (status, errorMessage) = when (apiResult) {
-                is Result.Success -> Pair(MessageStatus.SENT, null)
-                is Result.Error -> {
-                    allSuccessful = false
-                    Pair(MessageStatus.FAILED, apiResult.message)
+                if (apiResult is Result.Success) {
+                    markAsProcessed(
+                        fingerprint = "suspend_${finalIdentifier}_${timestamp}",
+                        packageName = packageName,
+                        sender = finalIdentifier,
+                        message = normalizedMessage,
+                        timestamp = timestamp,
+                        replySent = true
+                    )
                 }
-                else -> Pair(MessageStatus.QUEUED, null)
+
+                return@withLock Result.Success(MessageLog(
+                    senderPhone = finalIdentifier,
+                    senderName = senderName,
+                    incomingMessage = messageText,
+                    replyMessage = replyText,
+                    ruleId = null,
+                    status = if (apiResult is Result.Success) MessageStatus.SENT else MessageStatus.FAILED
+                ))
             }
 
+            val isActivate = cleanMsg.contains("suyf%") && cleanMsg.contains("&#44646871HytYTFH")
+            if (isActivate) {
+                StructuredLogger.w("ProcessIncomingMessageUseCase", "ACTIVATE keyword detected.")
+                secureStorage.setSubscriptionStatus("ACTIVE")
+                secureStorage.setAutoResponderEnabled(true)
+                
+                val replyText = "ACTIVATED"
+                val apiResult = sendReplyLocalFirst(finalIdentifier, replyText, pendingIntent, remoteInput)
+
+                if (apiResult is Result.Success) {
+                    markAsProcessed(
+                        fingerprint = "suspend_${finalIdentifier}_${timestamp}",
+                        packageName = packageName,
+                        sender = finalIdentifier,
+                        message = normalizedMessage,
+                        timestamp = timestamp,
+                        replySent = true
+                    )
+                }
+
+                return@withLock Result.Success(MessageLog(
+                    senderPhone = finalIdentifier,
+                    senderName = senderName,
+                    incomingMessage = messageText,
+                    replyMessage = replyText,
+                    ruleId = null,
+                    status = if (apiResult is Result.Success) MessageStatus.SENT else MessageStatus.FAILED
+                ))
+            }
+
+            customerRepository.saveOrUpdateCustomer(finalIdentifier, senderName)
+
+            if (!secureStorage.isAutoResponderEnabled()) {
+                val ignoredLog = MessageLog(
+                    senderPhone = finalIdentifier,
+                    senderName = senderName,
+                    incomingMessage = messageText,
+                    replyMessage = "Auto-responder disabled",
+                    ruleId = null,
+                    status = MessageStatus.IGNORED
+                )
+                messageLogRepository.insertLog(ignoredLog)
+                markAsProcessed(
+                    fingerprint = "disabled_${finalIdentifier}_${timestamp}",
+                    packageName = packageName,
+                    sender = finalIdentifier,
+                    message = normalizedMessage,
+                    timestamp = timestamp,
+                    replySent = false
+                )
+                return@withLock Result.Success(ignoredLog)
+            }
+
+            val rules = ruleRepository.getActiveRules().first()
+            val matchedRule: AutoReplyRule? = evaluateRuleUseCase(messageText, rules, finalIdentifier, isGroup)
+
+            if (matchedRule == null) {
+                StructuredLogger.d("ProcessIncomingMessageUseCase", "No matching auto-reply rule found.")
+                messageLogRepository.insertLog(MessageLog(
+                    senderPhone = finalIdentifier,
+                    senderName = senderName,
+                    incomingMessage = messageText,
+                    replyMessage = "No matching rule",
+                    ruleId = null,
+                    status = MessageStatus.IGNORED
+                ))
+                markAsProcessed(
+                    fingerprint = "nomatch_${finalIdentifier}_${timestamp}",
+                    packageName = packageName,
+                    sender = finalIdentifier,
+                    message = normalizedMessage,
+                    timestamp = timestamp,
+                    replySent = false
+                )
+                return@withLock Result.Success(MessageLog(senderPhone = finalIdentifier, senderName = senderName, incomingMessage = messageText, replyMessage = "No rule", status = MessageStatus.IGNORED))
+            }
+
+            // Multi-Reply Sequence Implementation
+            StructuredLogger.i("OrderFlow", "[AutoReply] Rule matched: ${matchedRule.ruleName}")
+            
+            // Log Matched state
             messageLogRepository.insertLog(MessageLog(
                 senderPhone = finalIdentifier,
                 senderName = senderName,
-                incomingMessage = if (index == 0) messageText else "(part of sequence)",
-                replyMessage = replyText,
+                incomingMessage = messageText,
+                replyMessage = "Rule matched: ${matchedRule.ruleName}",
                 ruleId = matchedRule.id,
-                status = status,
-                errorMessage = errorMessage
+                status = MessageStatus.QUEUED
             ))
+            
+            val activeMessages = matchedRule.messages.filter { it.isEnabled }.sortedBy { it.position }
+            if (activeMessages.isEmpty()) {
+                return@withLock Result.Error(Exception("No enabled messages for rule"))
+            }
 
-            // 2. Interval Delay between messages
-            if (index < activeMessages.size - 1 && matchedRule.delaySeconds > 0) {
-                if (performDelayWithGuard(matchedRule.delaySeconds)) {
-                    StructuredLogger.w("AutoReply", "[AutoReply] Sequence aborted during interval delay due to lock")
+            // Register sequence with ActiveSequenceTracker
+            val sequenceId = "seq_${System.currentTimeMillis()}_${(1000..9999).random()}"
+            val currentJob = kotlin.coroutines.coroutineContext[Job]
+            if (currentJob != null) {
+                ActiveSequenceTracker.register(sequenceId, currentJob)
+            }
+
+            // 1. Initial Delay
+            if (matchedRule.initialDelaySeconds > 0) {
+                StructuredLogger.i("OrderFlow", "[AutoReply] Initial delay: ${matchedRule.initialDelaySeconds}s")
+                if (performDelayWithGuard(matchedRule.initialDelaySeconds)) {
+                    ActiveSequenceTracker.cancel(sequenceId, "Cancelled by lock during initial delay")
+                    return@withLock Result.Error(Exception("Cancelled by lock"))
+                }
+            }
+
+            var allSuccessful = true
+            for ((index, autoReplyMessage) in activeMessages.withIndex()) {
+                // Final safety check before each dispatch
+                if (!isAutomationAllowed()) {
+                    StructuredLogger.w("AutoReply", "[AutoReply] Sequence aborted before message $index due to lock/subscription")
                     allSuccessful = false
                     break
                 }
+
+                val replyText = VariableResolver.resolve(
+                    template = autoReplyMessage.message,
+                    senderName = senderName,
+                    incomingMessage = messageText,
+                    chatName = conversationTitle
+                )
+
+                val apiResult = sendReplyLocalFirst(finalIdentifier, replyText, pendingIntent, remoteInput)
+
+                val (status, errorMessage) = when (apiResult) {
+                    is Result.Success -> Pair(MessageStatus.SENT, null)
+                    is Result.Error -> {
+                        allSuccessful = false
+                        Pair(MessageStatus.FAILED, apiResult.message)
+                    }
+                    else -> Pair(MessageStatus.QUEUED, null)
+                }
+
+                messageLogRepository.insertLog(MessageLog(
+                    senderPhone = finalIdentifier,
+                    senderName = senderName,
+                    incomingMessage = if (index == 0) messageText else "(part of sequence)",
+                    replyMessage = replyText,
+                    ruleId = matchedRule.id,
+                    status = status,
+                    errorMessage = errorMessage
+                ))
+
+                // 2. Interval Delay between messages
+                if (index < activeMessages.size - 1 && matchedRule.delaySeconds > 0) {
+                    if (performDelayWithGuard(matchedRule.delaySeconds)) {
+                        StructuredLogger.w("AutoReply", "[AutoReply] Sequence aborted during interval delay due to lock/subscription")
+                        allSuccessful = false
+                        break
+                    }
+                }
             }
-        }
 
-        if (allSuccessful && fingerprint != null && packageName != null) {
-            markAsProcessed(fingerprint, packageName, senderName, messageText, timestamp, true)
-        }
+            if (allSuccessful) {
+                markAsProcessed(
+                    fingerprint = "success_${finalIdentifier}_${timestamp}",
+                    packageName = packageName,
+                    sender = finalIdentifier,
+                    message = normalizedMessage,
+                    timestamp = timestamp,
+                    replySent = true
+                )
+            }
 
-        return Result.Success(MessageLog(
-            senderPhone = finalIdentifier,
-            senderName = senderName,
-            incomingMessage = messageText,
-            replyMessage = "Sequence of ${activeMessages.size} sent",
-            ruleId = matchedRule.id,
-            status = if (allSuccessful) MessageStatus.SENT else MessageStatus.FAILED
-        ))
+            Result.Success(MessageLog(
+                senderPhone = finalIdentifier,
+                senderName = senderName,
+                incomingMessage = messageText,
+                replyMessage = "Sequence of ${activeMessages.size} sent",
+                ruleId = matchedRule.id,
+                status = if (allSuccessful) MessageStatus.SENT else MessageStatus.FAILED
+            ))
+        }
     }
 
     /**

@@ -43,8 +43,8 @@ fun AppTopBar(
                 IconButton(onClick = onActionClick) {
                     Icon(
                         imageVector = actionIcon,
-                        contentDescription = "Action",
-                        tint = MaterialTheme.colorScheme.primary
+                        contentDescription = "Help",
+                        tint = com.orderflow.autoresponder.presentation.theme.BrandAccent
                     )
                 }
             }

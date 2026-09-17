@@ -46,6 +46,8 @@ class DashboardViewModel @Inject constructor(
 
     fun loadDashboardData() {
         val masterEnabled = secureStorage.isAutoResponderEnabled()
+        
+        // Explicitly refresh access status
         val isAccessGranted = isNotificationServiceEnabled(context)
 
         combine(

@@ -154,10 +154,10 @@ class WhatsAppNotificationListener : NotificationListenerService() {
         // Extract Phone Number
         val extras = sbn.notification.extras ?: android.os.Bundle.EMPTY
         var senderPhone = ""
-        val waId = extras.getString("key_remote_jid")?.split("@")?.firstOrNull() 
+        val waId = extras.getString("key_remote_jid")?.split("@")?.firstOrNull()
             ?: extras.getString("sender_contact_id")
             ?: extras.getString("contact_id")
-        
+
         if (!waId.isNullOrBlank() && waId.all { it.isDigit() }) {
             senderPhone = waId
         }
