@@ -42,11 +42,10 @@ fun OnboardingScreen(viewModel: OnboardingViewModel) {
             verticalArrangement = Arrangement.Top
         ) {
             Spacer(modifier = Modifier.height(60.dp))
-            Icon(
-                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+            Image(
+                painter = painterResource(id = R.drawable.app_icon_original),
                 contentDescription = null,
-                modifier = Modifier.size(100.dp),
-                tint = Color.Unspecified // Preserve vector colors
+                modifier = Modifier.size(100.dp)
             )
 
             Spacer(modifier = Modifier.height(24.dp))

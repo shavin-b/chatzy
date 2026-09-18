@@ -532,7 +532,7 @@ private fun WizardStepCard(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .clip(CircleShape)
+                            .clip(CircleShape)
                         .background(
                             if (isCompleted) BrandGreen.copy(alpha = 0.2f) else BrandAccent.copy(alpha = 0.1f)
                         ),
