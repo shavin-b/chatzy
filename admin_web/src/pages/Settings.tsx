@@ -1,8 +1,10 @@
+import { DeviceEnrollmentApproval } from '../components/DeviceEnrollmentApproval';
 // Settings page — admin profile, online threshold, Firebase status
 
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db, firebaseProjectId } from '../services/firebase';
+import { brand } from '../config/brand';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/Toast';
 import { Settings, Wifi, CheckCircle, AlertCircle, Save } from 'lucide-react';
@@ -10,10 +12,10 @@ import { isSuperAdmin } from '../services/auth';
 import type { AdminSettings } from '../types';
 
 const DEFAULT_SETTINGS: AdminSettings = {
-  companyName: 'OrderFlow Solutions',
+  companyName: brand.company,
   companyLogoUrl: '',
-  supportEmail: 'support@orderflow.app',
-  supportPhone: '',
+  supportEmail: brand.supportEmail,
+  supportPhone: brand.supportPhone,
   defaultSubscriptionDays: 30,
   notificationTemplates: [],
   themeMode: 'System',
@@ -115,6 +117,7 @@ export function SettingsPage() {
         )}
       </div>
 
+      <DeviceEnrollmentApproval />
       {/* Firebase connection status */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Firebase Status</h3>
@@ -123,7 +126,7 @@ export function SettingsPage() {
             <Wifi className="h-5 w-5 text-teal-400" />
             <div>
               <p className="text-xs text-slate-500">Project</p>
-              <p className="font-mono text-xs font-semibold text-slate-300">order-flow-34826</p>
+              <p className="font-mono text-xs font-semibold text-slate-300">{firebaseProjectId}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 rounded-xl bg-slate-800 p-3">
@@ -145,7 +148,7 @@ export function SettingsPage() {
             <Settings className="h-5 w-5 text-slate-400" />
             <div>
               <p className="text-xs text-slate-500">Admin Console</p>
-              <p className="text-xs font-semibold text-slate-300">v1.0.0</p>
+              <p className="text-xs font-semibold text-slate-300">v{brand.version}</p>
             </div>
           </div>
         </div>

@@ -1,0 +1,11 @@
+﻿{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chatzy-device-command-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-02-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "FIREBASE_PROJECT_ID": "",
+    "ALLOWED_ORIGINS": ""
+  }
+}

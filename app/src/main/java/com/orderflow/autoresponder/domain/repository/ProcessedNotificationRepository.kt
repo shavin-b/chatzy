@@ -8,4 +8,5 @@ interface ProcessedNotificationRepository {
     suspend fun isAlreadyProcessed(fingerprint: String): Boolean
     suspend fun findDuplicate(sender: String, message: String, since: Long): ProcessedNotificationEntity?
     suspend fun clearOldNotifications(days: Int = 7)
+    suspend fun clearAllNotifications()
 }

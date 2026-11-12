@@ -19,4 +19,7 @@ interface ProcessedNotificationDao {
 
     @Query("DELETE FROM processed_notifications WHERE processedAt < :timestamp")
     suspend fun clearOldNotifications(timestamp: Long)
+
+    @Query("DELETE FROM processed_notifications")
+    suspend fun clearAllNotifications()
 }

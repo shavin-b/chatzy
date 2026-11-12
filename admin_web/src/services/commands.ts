@@ -32,6 +32,14 @@ export async function sendDeviceCommand(
   deviceId: string,
   command: 'LOCK' | 'UNLOCK' | 'SYNC'
 ): Promise<SendCommandResponse> {
+  // Opt-in secure rollout uses the Functions path; existing Worker configuration stays untouched.
+  if (import.meta.env.VITE_USE_CALLABLE_DEVICE_COMMANDS === 'true') {
+    const { getFunctions, httpsCallable } = await import('firebase/functions');
+    const { default: app } = await import('./firebase');
+    const result = await httpsCallable<{deviceId:string;command:string},SendCommandResponse>(
+      getFunctions(app, 'us-central1'), 'sendDeviceCommand')({deviceId,command});
+    return result.data;
+  }
   // 1. Verify VITE_COMMAND_API_BASE_URL configuration
   const rawBaseUrl = import.meta.env.VITE_COMMAND_API_BASE_URL;
   if (!rawBaseUrl || rawBaseUrl.trim() === '') {

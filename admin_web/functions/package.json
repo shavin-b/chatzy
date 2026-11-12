@@ -1,14 +1,15 @@
 {
-  "name": "orderflow-admin-functions",
+  "name": "chatzy-admin-functions",
   "version": "1.0.0",
-  "description": "Firebase Cloud Functions for OrderFlow Admin Web Dashboard",
+  "description": "Firebase Cloud Functions for Chatzy Admin Web Dashboard",
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test": "node --test scripts/*.test.cjs"
   },
   "engines": {
     "node": "20"

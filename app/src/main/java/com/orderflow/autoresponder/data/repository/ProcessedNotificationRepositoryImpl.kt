@@ -29,4 +29,8 @@ class ProcessedNotificationRepositoryImpl @Inject constructor(
         val cutoff = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
         dao.clearOldNotifications(cutoff)
     }
+
+    override suspend fun clearAllNotifications() {
+        dao.clearAllNotifications()
+    }
 }

@@ -69,13 +69,13 @@ object DeviceBrandHelper {
     fun getBrandGuidanceSteps(): List<String> {
         return when (getBrand()) {
             Brand.XIAOMI -> listOf(
-                "Enable 'Autostart' toggle for OrderFlow.",
+                "Enable 'Autostart' toggle for Chatzy.",
                 "Set Battery Saver to 'No restrictions'.",
-                "Lock OrderFlow in Recent Apps screen."
+                "Lock Chatzy in Recent Apps screen."
             )
             Brand.SAMSUNG -> listOf(
                 "Go to Battery -> Background usage limits.",
-                "Ensure OrderFlow is NOT in 'Sleeping' or 'Deep sleeping' apps list.",
+                "Ensure Chatzy is NOT in 'Sleeping' or 'Deep sleeping' apps list.",
                 "Set Battery usage to 'Unrestricted'."
             )
             Brand.OPPO, Brand.REALME -> listOf(
@@ -83,7 +83,7 @@ object DeviceBrandHelper {
                 "In Battery settings, set App Battery Management to 'Don't optimize'."
             )
             Brand.ONEPLUS -> listOf(
-                "Enable 'Auto-launch' for OrderFlow.",
+                "Enable 'Auto-launch' for Chatzy.",
                 "Set Battery optimization to 'Don't optimize'."
             )
             Brand.VIVO -> listOf(
@@ -92,16 +92,16 @@ object DeviceBrandHelper {
             )
             Brand.HUAWEI, Brand.HONOR -> listOf(
                 "Go to App Launch settings.",
-                "Turn OFF 'Manage automatically' for OrderFlow.",
+                "Turn OFF 'Manage automatically' for Chatzy.",
                 "Turn ON 'Auto-launch', 'Secondary launch', and 'Run in background'."
             )
             Brand.TRANSSION -> listOf(
                 "Open Phone Master -> Auto-start Management.",
-                "Allow OrderFlow to auto-start and run in background."
+                "Allow Chatzy to auto-start and run in background."
             )
             Brand.ASUS -> listOf(
                 "Open Mobile Manager -> Auto-start Manager.",
-                "Enable auto-start for OrderFlow."
+                "Enable auto-start for Chatzy."
             )
             Brand.OTHER -> listOf(
                 "Set Battery usage to 'Unrestricted' in App Info.",

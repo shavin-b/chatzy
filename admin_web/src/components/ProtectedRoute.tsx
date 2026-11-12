@@ -38,7 +38,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
         </div>
         <h2 className="text-xl font-bold text-white">Access Denied</h2>
         <p className="max-w-sm text-sm text-slate-400">
-          Your account is not authorized to access the OrderFlow Admin Console. Contact a Super Admin to grant you access.
+          Your account is not authorized to access the Chatzy Admin Console. Contact a Super Admin to grant you access.
         </p>
         <button
           onClick={() => signOut()}

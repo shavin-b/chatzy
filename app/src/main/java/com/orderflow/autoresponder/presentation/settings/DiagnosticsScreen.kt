@@ -141,7 +141,7 @@ fun DiagnosticsScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "OrderFlow uses Android NotificationListenerService to intercept and reply to WhatsApp messages. If auto-replies stop working, please toggle Notification Access OFF and ON again in system settings.",
+                        text = "Chatzy uses Android NotificationListenerService to intercept and reply to WhatsApp messages. If auto-replies stop working, please toggle Notification Access OFF and ON again in system settings.",
                         style = MaterialTheme.typography.bodySmall,
                         color = BrandTextSecondary,
                         lineHeight = 16.sp

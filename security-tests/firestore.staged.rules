@@ -1,0 +1,114 @@
+rules_version = '2';
+// CHATZY CANDIDATE ONLY. Not referenced by deployment firebase.json.
+// Legacy Android has no Auth; publishing this before authenticated enrollment breaks it.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function hasProfile() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function role() { return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('role', ''); }
+    function admin() { return hasProfile() && role() in ['Super Admin', 'Admin', 'Support']; }
+    function canOperate() { return hasProfile() && role() in ['Super Admin', 'Admin']; }
+    function superAdmin() { return hasProfile() && role() == 'Super Admin'; }
+    function device(id) {
+      return signedIn() && request.auth.token.get('device_id', '') == id && id.size() > 0
+        && exists(/databases/$(database)/documents/deviceBindings/$(id))
+        && get(/databases/$(database)/documents/deviceBindings/$(id)).data.authUid == request.auth.uid
+        && get(/databases/$(database)/documents/deviceBindings/$(id)).data.active == true;
+    }
+    function ownEmail(value) { return signedIn() && value == request.auth.token.get('email', '') && value.size() > 0; }
+    function changedOnly(fields) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields); }
+    function validSubscriptionPatch() {
+      let d = request.resource.data;
+      let keys = d.diff(resource.data).affectedKeys();
+      return (!keys.hasAny(['subscriptionEnd']) || d.subscriptionEnd == null
+          || (d.subscriptionEnd is number && d.subscriptionEnd >= 0) || d.subscriptionEnd is timestamp)
+        && (!keys.hasAny(['status']) || d.status in ['Active', 'Expiring Soon', 'Expired', 'Suspended', 'Offline', 'Uninstalled'])
+        && (!keys.hasAny(['subscriptionStatus']) || d.subscriptionStatus in ['ACTIVE', 'EXPIRING_SOON', 'EXPIRED', 'SUSPENDED', 'Trial', 'Active']);
+    }
+    function validAdmin(uid) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['name', 'email', 'role', 'lastLogin'])
+        && d.keys().hasOnly(['adminId', 'name', 'email', 'role', 'lastLogin', 'avatarUrl'])
+        && d.get('adminId', uid) == uid
+        && d.name is string && d.name.size() > 0
+        && d.email is string && d.email.size() > 0
+        && d.role in ['Super Admin', 'Admin', 'Support']
+        && d.lastLogin is int && d.lastLogin >= 0
+        && (d.get('avatarUrl', null) == null || d.avatarUrl is string);
+    }
+
+    // Pairing requests and UID assignments are server-only; no client can self-bind.
+    match /deviceBindings/{id} {
+      allow get: if superAdmin() || (signedIn() && resource.data.authUid == request.auth.uid);
+      allow list, write: if false;
+    }
+    match /deviceEnrollments/{uid} { allow read, write: if false; }
+    match /deviceEnrollmentRequests/{id} { allow read, write: if false; }
+    match /admins/{uid} {
+      allow read: if admin();
+      allow create: if superAdmin() && validAdmin(uid);
+      allow update: if (superAdmin() && validAdmin(uid)
+          && (uid != request.auth.uid || request.resource.data.role == 'Super Admin'))
+        || (admin() && uid == request.auth.uid && changedOnly(['lastLogin'])
+          && request.resource.data.lastLogin is int && request.resource.data.lastLogin >= 0);
+      allow delete: if superAdmin() && uid != request.auth.uid;
+    }
+    match /devices/{id} {
+      allow read: if admin() || device(id);
+      // Trusted enrollment provisions devices without resetting subscription/lock state.
+      allow create, delete: if false;
+      allow update: if (device(id) && changedOnly([
+        'phoneModel', 'manufacturer', 'androidVersion', 'appVersion', 'appBuildNumber',
+        'userName', 'businessName', 'phoneNumber', 'lastSeen', 'lastSync', 'fcmToken',
+        'lastCommandId', 'lastCommandStatus', 'installationDate'
+      ])) || (canOperate() && changedOnly([
+        'subscriptionStart', 'subscriptionEnd', 'subscriptionStatus', 'status',
+        'daysRemaining', 'activationDate', 'lastSync'
+      ]) && validSubscriptionPatch());
+    }
+    match /deviceCommands/{id} {
+      allow read: if admin() || device(resource.data.deviceId);
+      allow create, delete: if false; // Command creation via trusted authorized backend only.
+      allow update: if device(resource.data.deviceId)
+        && changedOnly(['status', 'processedAt', 'errorMessage'])
+        && request.resource.data.status in ['RECEIVED', 'SUCCESS', 'FAILED']
+        && (resource.data.status in ['PENDING', 'SENT', 'RECEIVED'] || request.resource.data.status == resource.data.status)
+        && request.resource.data.processedAt is int && request.resource.data.processedAt >= 0
+        && (request.resource.data.get('errorMessage', null) == null || request.resource.data.errorMessage is string);
+    }
+    match /subscriptions/{id} {
+      allow read: if admin();
+      allow create: if canOperate()
+        && request.resource.data.subscriptionId == id
+        && request.resource.data.deviceId is string
+        && exists(/databases/$(database)/documents/devices/$(request.resource.data.deviceId))
+        && ownEmail(request.resource.data.updatedBy)
+        && request.resource.data.updatedAt is int
+        && request.resource.data.oldExpiryDate is number
+        && request.resource.data.newExpiryDate is number
+        && request.resource.data.daysAdded is number;
+      allow update, delete: if superAdmin();
+    }
+    match /logs/{id} {
+      allow read: if admin();
+      allow create: if canOperate() && ownEmail(request.resource.data.performedBy)
+        && request.resource.data.logId in ['', id]
+        && request.resource.data.timestamp is int;
+      // Existing browser addDoc -> setDoc(logId) flow: bind ID once, never edit log content.
+      allow update: if canOperate() && ownEmail(resource.data.performedBy)
+        && resource.data.logId == '' && request.resource.data.logId == id
+        && changedOnly(['logId']);
+      allow delete: if false;
+    }
+    match /notifications/{id} {
+      allow read: if admin();
+      allow create: if canOperate();
+      allow update, delete: if superAdmin();
+    }
+    match /settings/{id} {
+      allow read: if admin();
+      allow write: if superAdmin();
+    }
+    // All other collections and nested paths are denied by default.
+  }
+}

@@ -1,3 +1,4 @@
+import { brand } from '../config/brand';
 // DashboardLayout — sidebar + top header shell
 
 import { useState, type ReactNode } from 'react';
@@ -13,7 +14,6 @@ import {
   Menu,
   Bell,
   ChevronDown,
-  Shield,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { cn } from '../lib/cn';
@@ -117,11 +117,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
         >
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-teal-500/20">
-            <Shield className="h-4 w-4 text-teal-400" />
+            <img src="/favicon.svg" alt="Chatzy" className="h-8 w-8" />
           </div>
           {!sidebarCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">OrderFlow</p>
+              <p className="text-sm font-bold text-white truncate">{brand.product}</p>
               <p className="text-xs text-slate-500 truncate">Admin Console</p>
             </div>
           )}

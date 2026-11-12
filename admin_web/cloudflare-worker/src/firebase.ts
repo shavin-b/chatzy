@@ -2,6 +2,7 @@ import type { Env } from './types';
 
 let cachedAccessToken: string | null = null;
 let cachedTokenExpiry = 0;
+let cachedCredentialIdentity = "";
 
 // Base64Url encoder
 function base64UrlEncode(data: Uint8Array | string): string {
@@ -58,7 +59,8 @@ export async function getGoogleOAuthToken(env: Env): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
 
   // Return cached token if valid for at least 5 more minutes
-  if (cachedAccessToken && now < cachedTokenExpiry - 300) {
+  const identity = `${env.FIREBASE_PROJECT_ID}:${env.FIREBASE_SERVICE_ACCOUNT_EMAIL}`;
+  if (cachedAccessToken && cachedCredentialIdentity === identity && now < cachedTokenExpiry - 300) {
     return cachedAccessToken;
   }
 
@@ -106,12 +108,12 @@ export async function getGoogleOAuthToken(env: Env): Promise<string> {
   });
 
   if (!tokenResponse.ok) {
-    const errText = await tokenResponse.text();
-    console.error('[getGoogleOAuthToken] Token exchange failed:', errText);
+    console.error('[getGoogleOAuthToken] Token exchange failed; status:', tokenResponse.status);
     throw new Error(`Google OAuth token exchange failed: ${tokenResponse.status}`);
   }
 
   const tokenData = (await tokenResponse.json()) as { access_token: string; expires_in: number };
+  cachedCredentialIdentity = identity;
   cachedAccessToken = tokenData.access_token;
   cachedTokenExpiry = now + tokenData.expires_in;
 

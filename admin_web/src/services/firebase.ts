@@ -1,4 +1,4 @@
-// Firebase initialization — uses real project order-flow-34826
+// Firebase initialization for the explicitly configured environment
 // All config values come from environment variables (never hardcoded)
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -13,6 +13,14 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
+
+const missingConfig = Object.entries(firebaseConfig)
+  .filter(([, value]) => !value?.trim())
+  .map(([key]) => key);
+if (missingConfig.length) {
+  throw new Error(`Firebase configuration missing: ${missingConfig.join(', ')}. Configure .env.local with genuine Firebase Web app settings.`);
+}
+export const firebaseProjectId = firebaseConfig.projectId;
 
 // Prevent multiple initializations during hot-reload
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);

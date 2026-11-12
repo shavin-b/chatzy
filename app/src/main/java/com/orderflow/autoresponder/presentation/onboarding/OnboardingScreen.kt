@@ -43,15 +43,15 @@ fun OnboardingScreen(viewModel: OnboardingViewModel) {
         ) {
             Spacer(modifier = Modifier.height(60.dp))
             Image(
-                painter = painterResource(id = R.drawable.app_icon_original),
-                contentDescription = null,
+                painter = painterResource(id = R.drawable.chatzy_logo),
+                contentDescription = "Chatzy logo",
                 modifier = Modifier.size(100.dp)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Welcome",
+                text = "Welcome to Chatzy",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = BrandTextPrimary

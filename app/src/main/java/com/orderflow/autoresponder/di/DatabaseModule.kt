@@ -63,7 +63,8 @@ object DatabaseModule {
             "orderflow_autoresponder.db"
         )
             .addMigrations(MIGRATION_4_5)
-            .fallbackToDestructiveMigration()
+            // Preserve customer data: unknown historical schemas must never be wiped.
+            // Recover and test their migrations before releasing to older installations.
             .build()
     }
 

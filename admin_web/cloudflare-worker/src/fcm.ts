@@ -43,10 +43,9 @@ export async function sendFcmMessage(
     return { success: true };
   }
 
-  const errText = await res.text();
-  console.error(`[sendFcmMessage] FCM HTTP v1 dispatch FAILED for commandId: ${commandId} — Status: ${res.status}, Body: ${errText}`);
+  console.error(`[sendFcmMessage] FCM dispatch failed; commandId: ${commandId}, status: ${res.status}`);
   return {
     success: false,
-    errorMessage: `FCM HTTP v1 returned ${res.status}: ${errText}`,
+    errorMessage: `FCM HTTP v1 returned ${res.status}`,
   };
 }

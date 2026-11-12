@@ -1,6 +1,7 @@
 import { verifyFirebaseIdToken } from './auth';
 import { getAdminProfileFromFirestore, getDeviceFromFirestore, createDeviceCommandInFirestore, updateDeviceCommandStatusInFirestore, createAuditLogInFirestore, updateDeviceLockStateInFirestore, } from './firestore';
 import { sendFcmMessage } from './fcm';
+import { configurationError } from './config';
 const ALLOWED_COMMANDS = ['LOCK', 'UNLOCK', 'SYNC'];
 function getCorsHeaders(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -30,13 +31,17 @@ export default {
     async fetch(request, env, _ctx) {
         const corsHeaders = getCorsHeaders(request, env);
         const url = new URL(request.url);
+        const configError = configurationError(env);
+        if (configError) {
+            return jsonResponse({ error: 'CONFIG_ERROR', message: configError }, 503, corsHeaders);
+        }
         // 1. Handle CORS Options Preflight
         if (request.method === 'OPTIONS') {
             return new Response(null, { status: 204, headers: corsHeaders });
         }
         // 2. Health Endpoint
         if (request.method === 'GET' && url.pathname === '/health') {
-            return jsonResponse({ status: 'ok', service: 'orderflow-device-command-api' }, 200, corsHeaders);
+            return jsonResponse({ status: 'ok', service: 'chatzy-device-command-api' }, 200, corsHeaders);
         }
         // 3. API Endpoint: POST /api/device-command
         if (request.method === 'POST' && url.pathname === '/api/device-command') {
@@ -51,7 +56,7 @@ export default {
             // B. Verify Firebase ID Token
             let verifiedToken;
             try {
-                const projectId = env.FIREBASE_PROJECT_ID || 'order-flow-34826';
+                const projectId = env.FIREBASE_PROJECT_ID;
                 verifiedToken = await verifyFirebaseIdToken(idToken, projectId);
                 console.log(`[Worker] Caller authenticated: ${verifiedToken.uid} (${verifiedToken.email})`);
             }

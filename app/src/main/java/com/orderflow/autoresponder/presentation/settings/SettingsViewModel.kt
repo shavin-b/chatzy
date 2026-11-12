@@ -16,6 +16,8 @@ import com.orderflow.autoresponder.data.repository.MetaCredentialRepository
 import com.orderflow.autoresponder.data.repository.MetaPhoneNumber
 import com.orderflow.autoresponder.device.service.DeviceManager
 import com.orderflow.autoresponder.domain.model.MetaCredentials
+import com.orderflow.autoresponder.domain.repository.MessageLogRepository
+import com.orderflow.autoresponder.domain.repository.ProcessedNotificationRepository
 import com.orderflow.autoresponder.domain.repository.WhatsAppCloudApiRepository
 import com.orderflow.autoresponder.service.NotificationServiceWatchdog
 import com.orderflow.autoresponder.service.WhatsAppNotificationListener
@@ -87,7 +89,9 @@ class SettingsViewModel @Inject constructor(
     private val secureStorage: SecureStorage,
     private val cloudApiRepository: WhatsAppCloudApiRepository,
     private val metaCredentialRepository: MetaCredentialRepository,
-    private val deviceManager: DeviceManager
+    private val deviceManager: DeviceManager,
+    private val messageLogRepository: MessageLogRepository,
+    private val processedNotificationRepository: ProcessedNotificationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -377,5 +381,48 @@ class SettingsViewModel @Inject constructor(
         val creds = _uiState.value.credentials
         saveCredentials(creds)
         testApiConnection(creds)
+    }
+
+    // ── Data & Device Management ─────────────────────────────────────────────
+
+    fun clearLocalDataAndLogs() {
+        viewModelScope.launch {
+            try {
+                messageLogRepository.clearLogs()
+                processedNotificationRepository.clearAllNotifications()
+                _uiState.value = _uiState.value.copy(
+                    bannerMessage = "Local message logs and notification cache cleared successfully.",
+                    bannerIsSuccess = true
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    bannerMessage = "Failed to clear local data: ${e.message}",
+                    bannerIsSuccess = false
+                )
+            }
+        }
+    }
+
+    fun disconnectDevice() {
+        if (com.orderflow.autoresponder.BuildConfig.DEVICE_ENROLLMENT_ENABLED) {
+            _uiState.value = _uiState.value.copy(bannerMessage = "Enrolled device identity is retained. Contact your Super Admin for supervised recovery.", bannerIsSuccess = false)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                secureStorage.saveDeviceId("")
+                secureStorage.setProfileSyncPending(true)
+                deviceManager.initialize()
+                _uiState.value = _uiState.value.copy(
+                    bannerMessage = "Device registration disconnected and reset successfully.",
+                    bannerIsSuccess = true
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    bannerMessage = "Failed to disconnect device: ${e.message}",
+                    bannerIsSuccess = false
+                )
+            }
+        }
     }
 }

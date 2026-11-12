@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { brand } from '../config/brand';
 import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
@@ -52,11 +53,11 @@ export function LoginPage() {
           {/* Logo */}
           <div className="mb-8 flex flex-col items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-500/20 ring-1 ring-teal-500/30">
-              <Shield className="h-7 w-7 text-teal-400" />
+              <img src="/favicon.svg" alt="" className="h-14 w-14" />
             </div>
             <div className="text-center">
-              <h1 className="text-2xl font-bold tracking-tight text-white">OrderFlow</h1>
-              <p className="text-sm text-slate-500">Admin Console</p>
+              <h1 className="text-2xl font-bold tracking-tight text-white">{brand.product}</h1>
+              <p className="text-sm text-slate-500">{brand.tagline}</p>
             </div>
           </div>
 
@@ -79,7 +80,7 @@ export function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@orderflow.app"
+                placeholder="Administrator email"
                 autoComplete="email"
                 disabled={isLoading}
                 className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 disabled:opacity-50"
@@ -135,8 +136,7 @@ export function LoginPage() {
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-700">
-          OrderFlow Admin Console v1.0 · Project{' '}
-          <span className="font-mono text-slate-600">order-flow-34826</span>
+          {brand.console} | {brand.company}
         </p>
       </div>
     </div>

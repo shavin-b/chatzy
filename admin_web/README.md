@@ -1,3 +1,7 @@
+# Chatzy Admin Console deployment preparation
+
+Owner: SHAVIN SOLUTIONS (PVT) LTD. See ../CHATZY_ADMIN_DASHBOARD.md and ../CHATZY_FIREBASE_MIGRATION_PLAN.md for the current migration instructions. The setup notes below retain legacy-environment identifiers for compatibility; do not treat them as new Chatzy credentials or release approval.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

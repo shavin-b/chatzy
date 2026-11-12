@@ -11,6 +11,9 @@
 import * as admin from 'firebase-admin';
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { v4 as uuidv4 } from 'uuid';
+import { canSendDeviceCommand } from './authorization';
+import { DeviceEnrollmentService, EnrollmentCaller } from './enrollment';
+import { recordDeviceCommand, markDeviceCommandSent } from './commandAuthority';
 
 // ---------------------------------------------------------------
 // Initialize Firebase Admin SDK
@@ -43,7 +46,7 @@ async function verifyAdminRole(uid: string): Promise<{ name: string; email: stri
   }
   const data = adminDoc.data()!;
   const role: string = data.role ?? '';
-  if (!['Super Admin', 'Admin', 'Support'].includes(role)) {
+  if (!canSendDeviceCommand(role)) {
     console.error(`[sendDeviceCommand] Unauthorized role "${role}" for UID: ${uid}`);
     throw new HttpsError('permission-denied', `Role "${role}" is not authorized to perform this action.`);
   }
@@ -157,7 +160,7 @@ export const sendDeviceCommand = onCall(
     };
 
     console.log(`[sendDeviceCommand] Creating command document deviceCommands/${commandId}`);
-    await db.collection('deviceCommands').doc(commandId).set(commandRecord);
+    await recordDeviceCommand(db, commandId, commandRecord);
 
     // 8. Send FCM data message
     console.log(`[sendDeviceCommand] Attempting FCM message dispatch for commandId: ${commandId}`);
@@ -178,10 +181,7 @@ export const sendDeviceCommand = onCall(
       console.log(`[sendDeviceCommand] FCM message dispatch successful for commandId: ${commandId}`);
 
       // 9. Update status to SENT
-      await db.collection('deviceCommands').doc(commandId).update({
-        status: 'SENT',
-        sentAt: admin.firestore.Timestamp.now(),
-      });
+      await markDeviceCommandSent(db, commandId, admin.firestore.Timestamp.now());
 
       // 10. Write audit log
       const logId = `log_${callerUid}_${Date.now()}`;
@@ -251,3 +251,21 @@ export const getAdminRole = onCall(
     }
   }
 );
+
+// Enrollment is owner-approved: a client-provided OF- ID never establishes ownership.
+const enrollment = new DeviceEnrollmentService(db, admin.auth());
+function installationCaller(request: CallableRequest): EnrollmentCaller {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Installation authentication required.');
+  return {uid: request.auth.uid, anonymous: request.auth.token.firebase?.sign_in_provider === 'anonymous'};
+}
+export const requestDeviceEnrollment = onCall({region: 'us-central1'}, request => enrollment.request(installationCaller(request), request.data?.deviceId));
+export const completeDeviceEnrollment = onCall({region: 'us-central1'}, request => enrollment.complete(installationCaller(request), request.data?.deviceId));
+export const approveDeviceEnrollment = onCall({region: 'us-central1'}, request => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Admin authentication required.');
+  return enrollment.approve(request.auth.uid, request.data?.requestId);
+});
+export const listDeviceEnrollmentRequests = onCall({region: 'us-central1'}, async request => {
+  if (!request.auth || (await db.doc(`admins/${request.auth.uid}`).get()).data()?.role !== 'Super Admin') throw new HttpsError('permission-denied', 'Super Admin required.');
+  const requests = await db.collection('deviceEnrollmentRequests').where('state', '==', 'PENDING').where('expiresAt', '>', Date.now()).orderBy('expiresAt').limit(100).get();
+  return {requests: requests.docs.map(doc => doc.data()).filter(data => data.expiresAt > Date.now())};
+});

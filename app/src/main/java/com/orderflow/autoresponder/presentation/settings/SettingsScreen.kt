@@ -25,14 +25,21 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ReplyAll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,6 +54,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.orderflow.autoresponder.core.util.AppConstants
 import com.orderflow.autoresponder.presentation.components.AppTopBar
 import com.orderflow.autoresponder.presentation.theme.BrandAccent
 import com.orderflow.autoresponder.presentation.theme.BrandDarkBackground
@@ -80,6 +89,11 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var showNotificationDisclosure by remember { mutableStateOf(false) }
+    var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
+    var showClearDataConfirmDialog by remember { mutableStateOf(false) }
+    var showDisconnectConfirmDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.checkNotificationAccess()
@@ -102,6 +116,7 @@ fun SettingsScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            DeviceEnrollmentPanel()
             Text(
                 text = "Background Reliability & Setup",
                 style = MaterialTheme.typography.titleLarge,
@@ -109,7 +124,7 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Designed to run reliably in the background, subject to Android and device power-management restrictions. To improve automatic replies while your phone is idle, keep Notification Access enabled and allow OrderFlow to use background battery resources as recommended by your device.",
+                text = "Designed to run reliably in the background, subject to Android and device power-management restrictions. To improve automatic replies while your phone is idle, keep Notification Access enabled and allow Chatzy to use background battery resources as recommended by your device.",
                 style = MaterialTheme.typography.bodySmall,
                 color = BrandTextSecondary
             )
@@ -123,7 +138,7 @@ fun SettingsScreen(
                 buttonText = if (!state.isNotificationAccessGranted) "Grant" else null,
                 icon = Icons.Default.NotificationsActive,
                 onActionClick = {
-                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    showNotificationDisclosure = true
                 }
             )
 
@@ -441,6 +456,116 @@ fun SettingsScreen(
             )
 
             Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = BrandTextSecondary.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(text = "About ${AppConstants.PRODUCT_NAME}", style = MaterialTheme.typography.titleLarge, color = BrandTextPrimary)
+            Text(text = AppConstants.TAGLINE, style = MaterialTheme.typography.bodyMedium, color = BrandAccent)
+            Text(text = AppConstants.COMPANY_NAME, style = MaterialTheme.typography.bodySmall, color = BrandTextSecondary)
+            val installedVersion = remember {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
+            }
+            Text(text = "Version $installedVersion", style = MaterialTheme.typography.bodySmall, color = BrandTextSecondary)
+            Text(text = if (AppConstants.SUPPORT_EMAIL.isBlank()) "Support contact: pending business configuration" else "Support: ${AppConstants.SUPPORT_EMAIL}", style = MaterialTheme.typography.bodySmall, color = BrandTextSecondary)
+            Text(text = "Independent software. Chatzy is not affiliated with or endorsed by WhatsApp or Meta.", style = MaterialTheme.typography.bodySmall, color = BrandTextSecondary)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Privacy & Data Safety",
+                style = MaterialTheme.typography.titleLarge,
+                color = BrandTextPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Chatzy processes WhatsApp Business notification content on your device in Local Mode. Device registration, business profile, subscription status and command acknowledgements are transmitted to Firebase. Optional Cloud API replies transmit reply content and recipient details to Meta.",
+                style = MaterialTheme.typography.bodySmall,
+                color = BrandTextSecondary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            val privacyPolicyPlaceholderUrl = AppConstants.PRIVACY_POLICY_URL
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { showPrivacyPolicyDialog = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.PrivacyTip, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("In-App Policy", style = MaterialTheme.typography.labelMedium)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        try {
+                            if (privacyPolicyPlaceholderUrl.isNotBlank()) {
+                                uriHandler.openUri(privacyPolicyPlaceholderUrl)
+                            } else {
+                                showPrivacyPolicyDialog = true
+                            }
+                        } catch (_: Exception) {
+                            // URL fallback
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(imageVector = Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (privacyPolicyPlaceholderUrl.isBlank()) "Policy URL pending" else "Public Policy URL", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = BrandTextSecondary.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Data & Device Management",
+                style = MaterialTheme.typography.titleLarge,
+                color = BrandTextPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Clear local activity logs or reset local device registration.",
+                style = MaterialTheme.typography.bodySmall,
+                color = BrandTextSecondary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { showClearDataConfirmDialog = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusFailed)
+                ) {
+                    Icon(imageVector = Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Clear Logs & Cache", style = MaterialTheme.typography.labelMedium)
+                }
+
+                OutlinedButton(
+                    onClick = { showDisconnectConfirmDialog = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Disconnect Device", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 
@@ -455,6 +580,153 @@ fun SettingsScreen(
             onDismiss = {
                 viewModel.hideWebViewSheet()
             }
+        )
+    }
+
+    // ── Dialog 1: Notification Access Disclosure ────────────────────────────
+    if (showNotificationDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showNotificationDisclosure = false },
+            title = {
+                Text(
+                    text = "Notification Access Required",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = BrandTextPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Chatzy uses Notification Access to detect incoming WhatsApp Business notifications and process them according to your configured automatic reply rules.\n\n" +
+                            "How Notification Access is Used:\n" +
+                            "• Identifies incoming WhatsApp messages and sender information.\n" +
+                            "• Matches message text against your configured rules.\n" +
+                            "• Sends your configured response through WhatsApp's notification reply function (RemoteInput).\n\n" +
+                            "This access is strictly required for the automatic reply feature. Your notification content is processed locally on your device and is never sold or shared.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BrandTextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showNotificationDisclosure = false
+                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    }
+                ) {
+                    Text("I Understand - Enable Access", color = BrandGreen)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showNotificationDisclosure = false }
+                ) {
+                    Text("Not Now", color = BrandTextSecondary)
+                }
+            },
+            containerColor = BrandDarkBackground
+        )
+    }
+
+    // ── Dialog 2: Privacy Policy ─────────────────────────────────────────────
+    if (showPrivacyPolicyDialog) {
+        AlertDialog(
+            onDismissRequest = { showPrivacyPolicyDialog = false },
+            title = {
+                Text(
+                    text = "Privacy & Data Safety Policy",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = BrandTextPrimary
+                )
+            },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        text = "1. Local Auto Responder Processing\n" +
+                                "Chatzy reads WhatsApp Business notifications locally on your device to trigger auto-replies according to your configured rules. Replies are dispatched through Android's notification reply action. Notification content is processed on-device and is NOT collected, sold, or shared for advertising.\n\n" +
+                                "2. Firebase Cloud Communications\n" +
+                                "The app syncs device registration details, FCM tokens, and status heartbeats with Firebase solely for device status tracking and remote administration.\n\n" +
+                                "3. Meta WhatsApp Cloud API Architecture\n" +
+                                "Chatzy includes optional Meta WhatsApp Cloud API integration. When enabled, reply text and recipient identifiers are sent to Meta. Firebase Analytics may process app usage and device information. Clearing local data or disconnecting does not delete cloud records. Contact SHAVIN SOLUTIONS (PVT) LTD to request cloud deletion once support details are configured.\n\n" +
+                                "4. Published Privacy Policy\n" +
+                                "${AppConstants.PRIVACY_POLICY_URL.ifBlank { "Published privacy policy URL: pending configuration" }}\n" +
+                                "For privacy questions, contact the company using the support details shown in About when available.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BrandTextSecondary
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPrivacyPolicyDialog = false }) {
+                    Text("Close", color = BrandAccent)
+                }
+            },
+            containerColor = BrandDarkBackground
+        )
+    }
+
+    // ── Dialog 3: Clear Data Confirmation ────────────────────────────────────
+    if (showClearDataConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDataConfirmDialog = false },
+            title = {
+                Text("Clear Local Logs & Cache?", style = MaterialTheme.typography.titleMedium, color = BrandTextPrimary)
+            },
+            text = {
+                Text(
+                    "This will permanently delete local message logs and notification deduplication history from this device. Your auto-reply rules will remain intact.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BrandTextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearDataConfirmDialog = false
+                        viewModel.clearLocalDataAndLogs()
+                    }
+                ) {
+                    Text("Clear Data", color = StatusFailed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataConfirmDialog = false }) {
+                    Text("Cancel", color = BrandTextSecondary)
+                }
+            },
+            containerColor = BrandDarkBackground
+        )
+    }
+
+    // ── Dialog 4: Disconnect Device Confirmation ─────────────────────────────
+    if (showDisconnectConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisconnectConfirmDialog = false },
+            title = {
+                Text("Disconnect Device Registration?", style = MaterialTheme.typography.titleMedium, color = BrandTextPrimary)
+            },
+            text = {
+                Text(
+                    "This will reset your local device registration ID and trigger a clean registration sync with Firebase. Local auto-reply rules will not be deleted.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BrandTextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDisconnectConfirmDialog = false
+                        viewModel.disconnectDevice()
+                    }
+                ) {
+                    Text("Disconnect", color = StatusFailed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisconnectConfirmDialog = false }) {
+                    Text("Cancel", color = BrandTextSecondary)
+                }
+            },
+            containerColor = BrandDarkBackground
         )
     }
 }

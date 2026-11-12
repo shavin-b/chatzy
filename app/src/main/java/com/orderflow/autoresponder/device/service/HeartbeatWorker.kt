@@ -44,8 +44,8 @@ class HeartbeatWorker @AssistedInject constructor(
         }
 
         return try {
-            deviceRepository.updateDeviceInfo(deviceId, updates)
-            Result.success()
+            val result = deviceRepository.updateDeviceInfo(deviceId, updates)
+            if (result.isSuccess) Result.success() else Result.retry()
         } catch (e: Exception) {
             Result.retry()
         }

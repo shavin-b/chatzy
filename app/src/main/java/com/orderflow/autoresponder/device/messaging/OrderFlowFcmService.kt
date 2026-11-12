@@ -26,6 +26,9 @@ class OrderFlowFcmService : FirebaseMessagingService() {
     @Inject
     lateinit var deviceManager: DeviceManager
 
+    @Inject
+    lateinit var enrollment: com.orderflow.autoresponder.device.auth.DeviceEnrollment
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onNewToken(token: String) {
@@ -99,6 +102,14 @@ class OrderFlowFcmService : FirebaseMessagingService() {
         }
 
         try {
+            enrollment.verifyCommand(deviceId, commandId, command)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            StructuredLogger.w("OrderFlowFcmService", "Unverified remote command ignored; server state was not changed")
+            return
+        }
+        try {
             when (command) {
                 "LOCK" -> {
                     StructuredLogger.w("OrderFlowFcmService", "[DeviceControl] Lock command received via FCM")
@@ -155,9 +166,6 @@ class OrderFlowFcmService : FirebaseMessagingService() {
             StructuredLogger.e("OrderFlowFcmService", "Command execution failed", e)
         }
 
-        if (success) {
-            secureStorage.markCommandAsProcessed(commandId)
-        }
 
         // 4. Acknowledge to Firestore deviceCommands/{commandId} with Long timestamp
         val acknowledgement = DeviceCommand(
@@ -170,7 +178,8 @@ class OrderFlowFcmService : FirebaseMessagingService() {
         )
         
         // Update the command document AND (on LOCK/UNLOCK success) the device lock fields
-        deviceRepository.acknowledgeCommand(acknowledgement)
+        val acknowledged = deviceRepository.acknowledgeCommand(acknowledgement)
+        if (success && acknowledged.isSuccess) secureStorage.markCommandAsProcessed(commandId)
         deviceRepository.updateDeviceInfo(deviceId, mapOf(
             "lastCommandId" to commandId,
             "lastCommandStatus" to if (success) "SUCCESS" else "FAILED",

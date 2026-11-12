@@ -1,0 +1,5 @@
+# Configure locally using newly rotated credentials; never reuse the supplied private key.
+FIREBASE_PROJECT_ID=""
+FIREBASE_SERVICE_ACCOUNT_EMAIL=""
+FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY=""
+ALLOWED_ORIGINS="http://localhost:5173"

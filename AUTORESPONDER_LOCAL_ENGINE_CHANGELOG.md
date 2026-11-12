@@ -1,4 +1,6 @@
-# OrderFlow AutoResponder-style local engine
+> Chatzy migration note (2026-11-09): this historical review is not a production sign-off. See CHATZY_RELEASE_CHECKLIST.md, CHATZY_SECURITY_REVIEW.md and CHATZY_TEST_RESULTS.md. Company: SHAVIN SOLUTIONS (PVT) LTD. Support contact and published policy URL remain pending.
+
+# Chatzy AutoResponder-style local engine
 
 ## Implemented
 
@@ -30,7 +32,7 @@ No UI redesign was performed. The current rules, logs, settings, customers, dash
 
 ## Kept intentionally
 
-Firebase/FCM/device-management code remains available because it is used by OrderFlow's subscription/admin device-control features. It is no longer required for the critical local reply transport.
+Firebase/FCM/device-management code remains available because it is used by Chatzy's subscription/admin device-control features. It is no longer required for the critical local reply transport.
 
 ## Testing note
 

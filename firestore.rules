@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // OrderFlow Device Management Collection
+    match /devices/{deviceId} {
+      // Allows devices to register, update heartbeat status, and listen for status changes by device ID
+      allow read, create, update: if deviceId != null && deviceId != "";
+      allow delete: if false; // Disallow document deletion from client devices
+    }
+
+    // OrderFlow Remote Command Acknowledgements
+    match /deviceCommands/{commandId} {
+      // Allows devices to acknowledge executed remote commands
+      allow read, create, update: if commandId != null && commandId != "";
+      allow delete: if false;
+    }
+  }
+}

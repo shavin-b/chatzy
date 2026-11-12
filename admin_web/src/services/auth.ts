@@ -37,11 +37,13 @@ export async function getAdminProfile(uid: string): Promise<AdminUser | null> {
     const snap = await getDoc(doc(db, 'admins', uid));
     if (!snap.exists()) return null;
     const data = snap.data();
+    // Existence of a profile alone does not confer an administrator role.
+    if (!['Super Admin', 'Admin', 'Support'].includes(data.role)) return null;
     return {
       adminId: snap.id,
       email: data.email ?? '',
       name: data.name ?? 'Admin',
-      role: (data.role ?? 'Support') as AdminRole,
+      role: data.role as AdminRole,
       lastLogin: data.lastLogin ?? 0,
       avatarUrl: data.avatarUrl ?? null,
     };

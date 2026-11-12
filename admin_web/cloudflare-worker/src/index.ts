@@ -9,6 +9,7 @@ import {
   updateDeviceLockStateInFirestore,
 } from './firestore';
 import { sendFcmMessage } from './fcm';
+import { configurationError } from './config';
 
 const ALLOWED_COMMANDS: CommandType[] = ['LOCK', 'UNLOCK', 'SYNC'];
 
@@ -44,6 +45,10 @@ export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const corsHeaders = getCorsHeaders(request, env);
     const url = new URL(request.url);
+    const configError = configurationError(env);
+    if (configError) {
+      return jsonResponse({ error: 'CONFIG_ERROR', message: configError }, 503, corsHeaders);
+    }
 
     // 1. Handle CORS Options Preflight
     if (request.method === 'OPTIONS') {
@@ -53,7 +58,7 @@ export default {
     // 2. Health Endpoint
     if (request.method === 'GET' && url.pathname === '/health') {
       return jsonResponse(
-        { status: 'ok', service: 'orderflow-device-command-api' },
+        { status: 'ok', service: 'chatzy-device-command-api' },
         200,
         corsHeaders
       );
@@ -79,7 +84,7 @@ export default {
       // B. Verify Firebase ID Token
       let verifiedToken: Awaited<ReturnType<typeof verifyFirebaseIdToken>>;
       try {
-        const projectId = env.FIREBASE_PROJECT_ID || 'order-flow-34826';
+        const projectId = env.FIREBASE_PROJECT_ID;
         verifiedToken = await verifyFirebaseIdToken(idToken, projectId);
         console.log(`[Worker] Caller authenticated: ${verifiedToken.uid} (${verifiedToken.email})`);
       } catch (err: any) {

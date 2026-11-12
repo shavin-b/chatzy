@@ -1,55 +1,42 @@
 package com.orderflow.autoresponder.presentation.dashboard
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.orderflow.autoresponder.R
-import com.orderflow.autoresponder.presentation.components.AppTopBar
-import com.orderflow.autoresponder.presentation.theme.BrandAccent
-import com.orderflow.autoresponder.presentation.theme.BrandCardDark
-import com.orderflow.autoresponder.presentation.theme.BrandDarkBackground
-import com.orderflow.autoresponder.presentation.theme.BrandGreen
-import com.orderflow.autoresponder.presentation.theme.BrandTextPrimary
-import com.orderflow.autoresponder.presentation.theme.BrandTextSecondary
-import com.orderflow.autoresponder.presentation.theme.StatusSuccess
+import com.orderflow.autoresponder.domain.model.AutoReplyRule
+import com.orderflow.autoresponder.presentation.rules.RulesViewModel
+
+private val DashboardNavy = Color(0xFF101F46)
+private val DashboardBlue = Color(0xFF2859DD)
+private val DashboardMint = Color(0xFF69E4B7)
 
 @Composable
 fun DashboardScreen(
@@ -58,267 +45,200 @@ fun DashboardScreen(
     onNavigateToLogs: () -> Unit,
     onNavigateToCustomers: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToDiagnostics: () -> Unit
+    onNavigateToDiagnostics: () -> Unit,
+    rulesViewModel: RulesViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val rulesState by rulesViewModel.uiState.collectAsState()
     val uriHandler = LocalUriHandler.current
+    LaunchedEffect(Unit) { viewModel.loadDashboardData() }
 
-    // Refresh dashboard data (and permission status) whenever the user returns to this screen
-    LaunchedEffect(Unit) {
-        viewModel.loadDashboardData()
-    }
-
-    Scaffold(
-        topBar = { 
-            AppTopBar(
-                title = stringResource(R.string.dashboard_title),
-                actionIcon = Icons.AutoMirrored.Filled.HelpOutline,
-                onActionClick = {
-                    uriHandler.openUri("https://gemini.google.com/share/d/12KS_GTgc4qC2B7qaxQkW5W5Jr4RIPFPr?usp=sharing")
-                }
-            ) 
-        },
-        containerColor = BrandDarkBackground
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Master Switch Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = BrandCardDark),
-                shape = RoundedCornerShape(16.dp)
+    // This palette is local to Home; other screens retain their existing theme.
+    val colors = if (isSystemInDarkTheme()) darkColorScheme(
+        primary = Color(0xFFABC1FF), background = Color(0xFF0C1425),
+        surface = Color(0xFF18243B), onBackground = Color(0xFFF0F4FF),
+        onSurface = Color(0xFFF0F4FF), onSurfaceVariant = Color(0xFFBAC5DC)
+    ) else lightColorScheme(
+        primary = DashboardBlue, background = Color(0xFFF6F7FB),
+        surface = Color.White, onBackground = DashboardNavy,
+        onSurface = DashboardNavy, onSurfaceVariant = Color(0xFF596780)
+    )
+    MaterialTheme(colorScheme = colors) {
+        Scaffold(containerColor = colors.background) { insets ->
+            Column(
+                Modifier.fillMaxSize().padding(insets)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Auto-Responder Status",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = BrandTextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (state.isAutoResponderEnabled) "ACTIVE - Listening & Replying" else "PAUSED - Replies standard messages",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (state.isAutoResponderEnabled) StatusSuccess else BrandTextSecondary
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(56.dp))
+                    Text(stringResource(R.string.app_name), Modifier.weight(1f),
+                        style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = {
+                        uriHandler.openUri("https://gemini.google.com/share/d/12KS_GTgc4qC2B7qaxQkW5W5Jr4RIPFPr?usp=sharing")
+                    }) { Icon(Icons.AutoMirrored.Filled.HelpOutline, "Help", tint = colors.onSurfaceVariant) }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, "Settings", tint = colors.onSurface)
                     }
-
-                    Switch(
-                        checked = state.isAutoResponderEnabled,
-                        onCheckedChange = { viewModel.toggleAutoResponder(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = BrandTextPrimary,
-                            checkedTrackColor = BrandGreen
-                        )
-                    )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Notification Access Status Card
-            if (!state.isNotificationAccessGranted) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    shape = RoundedCornerShape(12.dp),
-                    onClick = onNavigateToSettings
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.padding(horizontal = 8.dp))
-                        Column {
-                            Text(
-                                text = "Notification Access Required",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                            Text(
-                                text = "Tap to enable auto-reply permission",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(com.orderflow.autoresponder.core.util.AppConstants.TAGLINE,
+                        style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                    Card(colors = CardDefaults.cardColors(containerColor = DashboardNavy),
+                        shape = RoundedCornerShape(28.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(24.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("Auto-reply", color = Color.White,
+                                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                Text(when {
+                                    !state.isAutoResponderEnabled -> "Paused"
+                                    !state.isNotificationAccessGranted -> "Enabled · Permission required"
+                                    else -> "Active · Listening & replying"
+                                }, color = if (state.isAutoResponderEnabled) DashboardMint else Color(0xFFD0D8EB),
+                                    style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Switch(checked = state.isAutoResponderEnabled,
+                                onCheckedChange = { viewModel.toggleAutoResponder(it) },
+                                modifier = Modifier.semantics { contentDescription = "Auto-reply" },
+                                colors = dashboardSwitchColors())
+                        }
+                    }
+                    if (!state.isNotificationAccessGranted) {
+                        Card(onClick = onNavigateToSettings,
+                            colors = CardDefaults.cardColors(containerColor = colors.errorContainer),
+                            shape = RoundedCornerShape(20.dp)) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.Settings, null, tint = colors.onErrorContainer)
+                                Column {
+                                    Text("Notification Access Required", color = colors.onErrorContainer,
+                                        style = MaterialTheme.typography.titleMedium)
+                                    Text("Tap to enable auto-reply permission", color = colors.onErrorContainer,
+                                        style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionTitle("Quick overview")
+                    val fontScale = LocalDensity.current.fontScale
+                    BoxWithConstraints {
+                        if (maxWidth >= 320.dp && fontScale <= 1.3f) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.height(IntrinsicSize.Min)) {
+                                StatCard("Active rules", state.activeRulesCount.toString(),
+                                    Icons.Default.List, Modifier.weight(1f).fillMaxHeight())
+                                StatCard("Replies today", state.todayRepliesCount.toString(),
+                                    Icons.Default.Message, Modifier.weight(1f).fillMaxHeight())
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                StatCard("Active rules", state.activeRulesCount.toString(), Icons.Default.List)
+                                StatCard("Replies today", state.todayRepliesCount.toString(), Icons.Default.Message)
+                            }
+                        }
+                    }
+                    ManagementRow("Customer Records", "${state.totalCustomersCount} total unique customers",
+                        Icons.Default.People, onNavigateToCustomers)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionTitle("Reply rules")
+                    ManagementRow("Auto-Reply Rules", "${state.activeRulesCount} active · ${state.totalRulesCount} total",
+                        Icons.Default.List, onNavigateToRules)
+                    when {
+                        rulesState.isLoading -> LinearProgressIndicator(Modifier.fillMaxWidth(), color = colors.primary)
+                        rulesState.rules.isEmpty() -> Text(
+                            "No auto-reply rules created yet.\nOpen Auto-Reply Rules and tap '+' to create your first rule!",
+                            style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp))
+                        else -> rulesState.rules.take(3).forEach { rule ->
+                            key(rule.id) {
+                                DashboardRuleRow(rule) { rulesViewModel.toggleRule(rule.id, it) }
+                            }
+                        }
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionTitle("Quick management")
+                    ManagementRow("Message Logs", "View incoming & automated replies", Icons.Default.Message, onNavigateToLogs)
+                    ManagementRow("Diagnostics & Status", "Check service & notification health", Icons.Default.Settings, onNavigateToDiagnostics)
+                }
             }
-
-            Text(
-                text = "Live Statistics",
-                style = MaterialTheme.typography.titleLarge,
-                color = BrandTextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Stat Cards Grid
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Replies Today",
-                    value = "${state.todayRepliesCount}",
-                    color = BrandAccent
-                )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Active Rules",
-                    value = "${state.activeRulesCount}/${state.totalRulesCount}",
-                    color = BrandGreen
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            StatCard(
-                modifier = Modifier.fillMaxWidth(),
-                title = "Total Unique Customers",
-                value = "${state.totalCustomersCount}",
-                color = StatusSuccess
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Quick Management",
-                style = MaterialTheme.typography.titleLarge,
-                color = BrandTextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            QuickActionButton(
-                title = "Auto-Reply Rules",
-                subtitle = "Manage keywords, delay & replies",
-                icon = Icons.Default.List,
-                onClick = onNavigateToRules
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            QuickActionButton(
-                title = "Message Logs",
-                subtitle = "View incoming & automated replies",
-                icon = Icons.Default.Message,
-                onClick = onNavigateToLogs
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            QuickActionButton(
-                title = "Customer Records",
-                subtitle = "Track contacts & conversation count",
-                icon = Icons.Default.People,
-                onClick = onNavigateToCustomers
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            QuickActionButton(
-                title = "Diagnostics & Status",
-                subtitle = "Check service & notification health",
-                icon = Icons.Default.Settings,
-                onClick = onNavigateToDiagnostics
-            )
         }
     }
 }
 
 @Composable
-private fun StatCard(
-    modifier: Modifier = Modifier,
-    title: String,
-    value: String,
-    color: androidx.compose.ui.graphics.Color
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = BrandCardDark),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = BrandTextSecondary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = value,
-                fontSize = 26.sp,
-                style = MaterialTheme.typography.headlineLarge,
-                color = color
-            )
+private fun SectionTitle(title: String) {
+    Text(title, style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+}
+
+@Composable
+private fun dashboardSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = DashboardNavy, checkedTrackColor = DashboardMint, checkedBorderColor = DashboardMint,
+    uncheckedThumbColor = Color(0xFFF0F4FF), uncheckedTrackColor = Color(0xFF596780),
+    uncheckedBorderColor = Color(0xFF8B99B3)
+)
+
+@Composable
+private fun BlueIcon(icon: ImageVector) {
+    Box(Modifier.clip(RoundedCornerShape(14.dp))
+        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)).padding(12.dp)) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+    }
+}
+
+@Composable
+private fun StatCard(title: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
+    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            BlueIcon(icon)
+            Text(value, style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun QuickActionButton(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(containerColor = BrandCardDark),
-        shape = RoundedCornerShape(12.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(BrandGreen.copy(alpha = 0.2f))
-                    .padding(10.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = BrandGreen
-                )
+private fun ManagementRow(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            BlueIcon(icon)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(modifier = Modifier.padding(horizontal = 8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = BrandTextPrimary,
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BrandTextSecondary,
-                    fontSize = 12.sp
-                )
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun DashboardRuleRow(rule: AutoReplyRule, onToggle: (Boolean) -> Unit) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                BlueIcon(Icons.Default.Message)
+                Text(rule.ruleName, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface)
+                Switch(rule.isActive, onToggle,
+                    modifier = Modifier.semantics { contentDescription = "Enable rule: ${rule.ruleName}" },
+                    colors = dashboardSwitchColors())
             }
+            Text("Keywords: ${rule.keywordsCsv}", style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Match Type: ${rule.matchOption.name}", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

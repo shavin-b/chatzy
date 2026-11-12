@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatzy Privacy Policy | SHAVIN SOLUTIONS (PVT) LTD</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #38bdf8;
+            --accent-green: #22c55e;
+            --warning-color: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 24px 16px;
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 32px 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 28px;
+        }
+
+        h1 {
+            font-size: 26px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: rgba(56, 189, 248, 0.15);
+            color: var(--accent-color);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        section {
+            margin-bottom: 28px;
+        }
+
+        h2 {
+            font-size: 18px;
+            color: var(--accent-color);
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        ul {
+            list-style-type: disc;
+            margin-left: 20px;
+            margin-bottom: 12px;
+        }
+
+        li {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .highlight-box {
+            background-color: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid var(--accent-green);
+            padding: 14px 16px;
+            border-radius: 0 8px 8px 0;
+            margin: 16px 0;
+        }
+
+        .highlight-box p {
+            color: var(--text-primary);
+            font-size: 13.5px;
+            margin-bottom: 0;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: rgba(51, 65, 85, 0.5);
+            color: var(--text-primary);
+        }
+
+        td {
+            color: var(--text-secondary);
+        }
+
+        footer {
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+            margin-top: 36px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+<header><h1>Chatzy Privacy Policy</h1><p class="subtitle">Smart Replies. Better Business.</p><p>SHAVIN SOLUTIONS (PVT) LTD | Last updated: 9 November 2026</p></header>
+<div class="highlight-box"><strong>Draft - publication pending.</strong> Business support details, published policy URL and the SDK data-collection review must be completed before commercial release.</div>
+<section><h2>1. Who operates Chatzy</h2><p>Chatzy is owned and operated by SHAVIN SOLUTIONS (PVT) LTD. It helps small businesses configure keyword-based automatic replies to WhatsApp Business notifications on Android. Chatzy is independent software and is not affiliated with or endorsed by WhatsApp or Meta.</p></section>
+<section><h2>2. Notification access and user control</h2><p>With your explicit permission, Chatzy uses Android Notification Access to read incoming WhatsApp Business notification sender information, text, timestamps and reply actions. It evaluates your rules and sends replies through Android notification reply actions. Notification access is sensitive: Android grants a notification-listener service access at the system level, while Chatzy filters supported WhatsApp Business notifications in its code.</p><p>You can decline access or revoke it in Android settings. Without it, notification-based automatic replies cannot operate. You can pause replies in Chatzy and control rules, group/private applicability, message sequences and delays. Background operation depends on Android and device power-management restrictions.</p></section>
+<section><h2>3. Local information and processing</h2><p>In Local Mode, notification content is evaluated on your device. Rules, configured reply messages, sender/customer profiles, execution logs and processed-notification records are stored in the app's private Room database. Settings, device identity and optional Meta credentials are stored in app-private preferences. The preferences implementation does not separately encrypt Meta tokens. Android app sandboxing protects these files against ordinary access by other apps; it is not a promise of absolute security.</p><p>The device registration and remote-command paths do not intentionally upload notification text or local customer conversation logs to Firestore. This does not mean all app information stays on your device.</p></section>
+<section><h2>4. Firebase registration, telemetry and administration</h2><p>Chatzy transmits device ID, FCM registration token, manufacturer/model, Android/app version, installation and heartbeat timestamps, configured business/profile name and phone number, subscription state/expiry, lock state and command acknowledgement information to Google Firebase. These records support installation management, monthly or annual subscription administration, service health and remote LOCK, UNLOCK and SYNC commands. Authorized operators access these records through administration tools.</p><p>FCM tokens route commands to an app installation; they are not WhatsApp login credentials. Google Firebase processes service data under its own terms and <a href="https://policies.google.com/privacy">privacy policy</a>. The app includes Firebase Analytics. Its actual SDK collection settings and associated disclosures are still under release review; this draft does not claim that analytics is absent.</p></section>
+<section><h2>5. Optional Meta Cloud API</h2><p>Local notification replies do not require Meta credentials. If you configure and enable optional Cloud API fallback, recipient identifiers and reply text are sent to Meta over the network. Explicit credential setup or connection tests may also contact Meta. Do not enable this mode unless you understand its data processing and have authority to use the relevant business account. Meta credentials must be kept confidential.</p></section>
+<section><h2>6. Purposes and sharing</h2><p>Information is used to provide automatic replies, business settings, subscription/device administration and service diagnostics. We do not sell notification content or use it for advertising. Google Firebase and, when configured, Meta are service providers involved in these functions. Administrative infrastructure also uses Cloudflare for command routing. Information may be disclosed where legally required. The operator must complete applicable legal and processor arrangements before release.</p></section>
+<section><h2>7. Retention</h2><p>Local rules, customer records and logs remain until removed through the applicable app controls, app data clearing or uninstalling. Some processed-notification cache records may be pruned by maintenance. Cloud device/subscription/command/audit records remain independently of your local installation. A final cloud retention schedule and deletion request procedure must be published by SHAVIN SOLUTIONS (PVT) LTD before commercial launch; no automatic cloud deletion period is promised in this draft.</p></section>
+<section><h2>8. Deletion and customer privacy controls</h2><p>Settings &rarr; Data &amp; Device Management &rarr; Clear Logs &amp; Cache removes local execution logs and processed-notification cache, not all rules/customer records or Firebase data. Disconnect Device resets local registration and may trigger registration again; it does not delete old cloud records. Uninstalling or clearing Android app data removes local data but does not delete cloud subscription/audit records.</p><p>To request cloud record access, correction or deletion, contact the company through the support channel once configured. Requests may require installation identity verification. Retention obligations and processing details must be explained in the final policy. Business users are responsible for appropriate notices and handling of their customers' information.</p></section>
+<section><h2>9. Security</h2><p>Network services use HTTPS/TLS and Android private storage. Existing authorization weaknesses are being addressed through a staged authenticated-device rollout. This draft does not claim that document IDs alone secure cloud data. No software can guarantee complete security; report concerns to the verified support channel when available.</p></section>
+<section><h2>10. Changes and contact</h2><p>Updates will be published with a revised date. Chatzy is intended for business users rather than children. For privacy and support matters, contact SHAVIN SOLUTIONS (PVT) LTD.</p><p><strong>[SUPPORT EMAIL ? BUSINESS CONFIGURATION REQUIRED]</strong><br>[SUPPORT PHONE ? BUSINESS CONFIGURATION REQUIRED]<br>[WEBSITE URL ? BUSINESS CONFIGURATION REQUIRED]<br>[PUBLISHED PRIVACY POLICY URL ? BUSINESS CONFIGURATION REQUIRED]</p></section>
+<footer>&copy; 2026 SHAVIN SOLUTIONS (PVT) LTD. Chatzy. All rights reserved.</footer>
+</div></body>
+</html>

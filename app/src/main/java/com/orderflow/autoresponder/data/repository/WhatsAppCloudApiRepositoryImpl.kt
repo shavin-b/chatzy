@@ -61,7 +61,7 @@ class WhatsAppCloudApiRepositoryImpl @Inject constructor(
             }
             val request = MetaSendMessageRequest(
                 toPhone = credentials.phoneNumberId,
-                text = TextPayload(body = "OrderFlow API Connection Verification Test")
+                text = TextPayload(body = "Chatzy API Connection Verification Test")
             )
             val authHeader = "Bearer ${credentials.accessToken}"
             val response = apiService.sendMessage(

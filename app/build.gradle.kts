@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -15,8 +17,10 @@ android {
         applicationId = "com.orderflow.autoresponder"
         minSdk = 23
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
+        // Explicit rollout switch; default keeps the working legacy path.
+        buildConfigField("boolean", "DEVICE_ENROLLMENT_ENABLED", (providers.gradleProperty("chatzyDeviceEnrollment").orNull == "true").toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -47,6 +51,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -100,6 +105,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.auth)
+    implementation("com.google.firebase:firebase-functions")
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
 
@@ -108,4 +114,36 @@ dependencies {
     // Unit Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+}
+
+// Standard Google Services source-set precedence; never copy or replace credentials.
+// Use -PexpectedFirebaseProjectId=<actual-project-id> in release CI to prevent cross-project builds.
+listOf("debug", "release").forEach { buildType ->
+    tasks.matching { it.name == "process${buildType.replaceFirstChar { c -> c.uppercaseChar() }}GoogleServices" }
+        .configureEach {
+            inputs.property("expectedFirebaseProjectId", providers.gradleProperty("expectedFirebaseProjectId").orElse(""))
+            doFirst {
+                val candidates = listOf(
+                    file("src/$buildType/google-services.json"),
+                    file("google-services.json")
+                )
+                val config = candidates.firstOrNull { it.isFile }
+                    ?: throw GradleException("Missing genuine google-services.json for $buildType; package must be com.orderflow.autoresponder")
+                @Suppress("UNCHECKED_CAST")
+                val json = JsonSlurper().parse(config) as Map<String, Any?>
+                val clients = json["client"] as? List<*> ?: emptyList<Any>()
+                val packageMatches = clients.any { client ->
+                    val info = (client as? Map<*, *>)?.get("client_info") as? Map<*, *>
+                    val androidInfo = info?.get("android_client_info") as? Map<*, *>
+                    androidInfo?.get("package_name") == "com.orderflow.autoresponder"
+                }
+                if (!packageMatches) throw GradleException("Firebase Android configuration package mismatch; expected com.orderflow.autoresponder")
+                val actualProject = (json["project_info"] as? Map<*, *>)?.get("project_id") as? String
+                if (actualProject.isNullOrBlank()) throw GradleException("Firebase configuration is missing project_id")
+                val expectedProject = providers.gradleProperty("expectedFirebaseProjectId").orNull
+                if (expectedProject != null && actualProject != expectedProject) {
+                    throw GradleException("Firebase configuration does not match expectedFirebaseProjectId; refusing build")
+                }
+            }
+        }
 }

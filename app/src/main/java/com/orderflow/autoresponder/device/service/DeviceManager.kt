@@ -27,7 +27,8 @@ class DeviceManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val secureStorage: SecureStorage,
     private val deviceRepository: DeviceRepository,
-    private val firebaseMessaging: FirebaseMessaging
+    private val firebaseMessaging: FirebaseMessaging,
+    private val enrollment: com.orderflow.autoresponder.device.auth.DeviceEnrollment
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -50,6 +51,15 @@ class DeviceManager @Inject constructor(
             val deviceId = getOrCreateDeviceId()
             StructuredLogger.i("DeviceManager", "Device ID: $deviceId")
 
+            if (enrollment.enabled) {
+                // Keep background recovery scheduled while physical approval is pending.
+                scheduleHeartbeat()
+                while (true) {
+                    try { enrollment.ensureAuthorized(deviceId); break }
+                    catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (_: Exception) { kotlinx.coroutines.delay(30_000) }
+                }
+            }
             // 1. Start observer FIRST — reads authoritative lock/subscription state from Firestore
             //    BEFORE we write anything. This ensures any admin-set lock is applied locally
             //    before registerOrUpdateDevice reads and re-writes the local state.
@@ -109,7 +119,7 @@ class DeviceManager @Inject constructor(
 
     private fun getOrCreateDeviceId(): String {
         val existingId = secureStorage.getDeviceId()
-        if (existingId != null) return existingId
+        if (!existingId.isNullOrBlank()) return existingId
 
         // Use Android ID for persistence across re-installs
         val androidId = android.provider.Settings.Secure.getString(
@@ -156,7 +166,7 @@ class DeviceManager @Inject constructor(
             "appBuildNumber"   to appBuildNumber,
             "installationDate" to packageInfo.firstInstallTime,
             "userName"         to businessName.ifBlank { "User ${deviceId.takeLast(4)}" },
-            "businessName"     to businessName.ifBlank { "OrderFlow User" },
+            "businessName"     to businessName.ifBlank { "Chatzy User" },
             "phoneNumber"      to whatsappNumber,
             "lastSeen"         to now,
             "lastSync"         to now,
@@ -220,7 +230,7 @@ class DeviceManager @Inject constructor(
                 .collect { data ->
                     if (data != null) {
                         StructuredLogger.w("DeviceManager", "[DeviceControl] REMOTE SNAPSHOT RECEIVED")
-                        StructuredLogger.d("DeviceManager", "[DeviceControl] Data: $data")
+                        // Never log the raw device document: it contains the FCM token.
 
                         // 1. Handle Admin Lock State (Independent)
                         // The website might use different fields, so we check ALL of them.
@@ -262,7 +272,16 @@ class DeviceManager @Inject constructor(
 
                         // 2. Handle Subscription Status
                         // Website might use "subscriptionStatus" or just "status"
-                        val subStatus = data["subscriptionStatus"]?.toString() ?: "ACTIVE"
+                        val remoteEnd = when (val value = data["subscriptionEnd"]) {
+                            is Number -> value.toLong()
+                            is com.google.firebase.Timestamp -> value.toDate().time
+                            else -> null
+                        }
+                        val subStatus = if (enrollment.enabled) {
+                            secureStorage.saveSubscriptionEnd(remoteEnd ?: 0L)
+                            com.orderflow.autoresponder.device.auth.DeviceSubscriptionState.resolve(
+                                data["status"]?.toString(), data["subscriptionStatus"]?.toString(), remoteEnd, System.currentTimeMillis())
+                        } else data["subscriptionStatus"]?.toString() ?: "ACTIVE"
                         
                         if (secureStorage.getSubscriptionStatus() != subStatus) {
                             StructuredLogger.i("DeviceManager", "[DeviceControl] REMOTE CHANGE DETECTED: Subscription -> $subStatus")

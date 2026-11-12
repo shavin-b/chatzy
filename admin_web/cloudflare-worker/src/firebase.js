@@ -1,5 +1,6 @@
 let cachedAccessToken = null;
 let cachedTokenExpiry = 0;
+let cachedCredentialIdentity = "";
 // Base64Url encoder
 function base64UrlEncode(data) {
     const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
@@ -35,7 +36,8 @@ async function importPrivateKey(pemKey) {
 export async function getGoogleOAuthToken(env) {
     const now = Math.floor(Date.now() / 1000);
     // Return cached token if valid for at least 5 more minutes
-    if (cachedAccessToken && now < cachedTokenExpiry - 300) {
+    const identity = `${env.FIREBASE_PROJECT_ID}:${env.FIREBASE_SERVICE_ACCOUNT_EMAIL}`;
+    if (cachedAccessToken && cachedCredentialIdentity === identity && now < cachedTokenExpiry - 300) {
         return cachedAccessToken;
     }
     const clientEmail = env.FIREBASE_SERVICE_ACCOUNT_EMAIL;
@@ -71,11 +73,11 @@ export async function getGoogleOAuthToken(env) {
         }),
     });
     if (!tokenResponse.ok) {
-        const errText = await tokenResponse.text();
-        console.error('[getGoogleOAuthToken] Token exchange failed:', errText);
+        console.error('[getGoogleOAuthToken] Token exchange failed; status:', tokenResponse.status);
         throw new Error(`Google OAuth token exchange failed: ${tokenResponse.status}`);
     }
     const tokenData = (await tokenResponse.json());
+    cachedCredentialIdentity = identity;
     cachedAccessToken = tokenData.access_token;
     cachedTokenExpiry = now + tokenData.expires_in;
     return cachedAccessToken;

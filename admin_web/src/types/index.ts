@@ -1,5 +1,5 @@
 // ============================================================
-// OrderFlow Admin Web Dashboard — TypeScript Types
+// Chatzy Admin Web Dashboard — TypeScript Types
 // Mirrors exact Firestore field names from Android project
 // ============================================================
 
