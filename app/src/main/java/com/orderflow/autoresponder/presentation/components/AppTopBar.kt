@@ -33,7 +33,7 @@ fun AppTopBar(
                     Icon(
                         imageVector = navigationIcon,
                         contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onPrimary
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -44,13 +44,13 @@ fun AppTopBar(
                     Icon(
                         imageVector = actionIcon,
                         contentDescription = "Help",
-                        tint = com.orderflow.autoresponder.presentation.theme.BrandAccent
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = BrandDarkBackground
+            containerColor = MaterialTheme.colorScheme.surface
         )
     )
 }

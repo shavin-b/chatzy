@@ -1,77 +1,45 @@
 package com.orderflow.autoresponder.presentation.components
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.orderflow.autoresponder.core.util.DateUtils
 import com.orderflow.autoresponder.domain.model.Customer
-import com.orderflow.autoresponder.presentation.theme.BrandAccent
-import com.orderflow.autoresponder.presentation.theme.BrandCardDark
-import com.orderflow.autoresponder.presentation.theme.BrandTextPrimary
-import com.orderflow.autoresponder.presentation.theme.BrandTextSecondary
 
 @Composable
 fun CustomerCard(customer: Customer) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = BrandCardDark),
-        shape = RoundedCornerShape(10.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = customer.name.ifBlank { customer.phone },
-                    style = MaterialTheme.typography.titleLarge,
-                    color = BrandTextPrimary
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = customer.phone,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BrandAccent
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Last seen: ${DateUtils.formatDateTime(customer.lastInteractionTime)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BrandTextSecondary,
-                    fontSize = 12.sp
-                )
+    val colors = MaterialTheme.colorScheme
+    val name = customer.name.ifBlank { customer.phone }
+    Column {
+        Row(Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(Modifier.size(50.dp).clip(CircleShape).background(colors.secondaryContainer),
+                contentAlignment = Alignment.Center) {
+                Text(name.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    style = MaterialTheme.typography.titleLarge, color = colors.primary)
             }
-
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "${customer.totalMessages}",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = BrandAccent
-                )
-                Text(
-                    text = "Messages",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BrandTextSecondary,
-                    fontSize = 11.sp
-                )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(name, style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(customer.phone, style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant)
+                Text(DateUtils.formatDateTime(customer.lastInteractionTime),
+                    style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+            }
+            Surface(shape = CircleShape, color = colors.primary) {
+                Text("${customer.totalMessages}", Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = colors.onPrimary, style = MaterialTheme.typography.labelMedium)
             }
         }
+        HorizontalDivider(Modifier.padding(start = 64.dp), color = colors.outlineVariant)
     }
 }

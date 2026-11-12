@@ -36,7 +36,7 @@ fun MessageLogItem(log: MessageLog) {
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = BrandCardDark),
-        shape = RoundedCornerShape(10.dp)
+        shape = RoundedCornerShape(topStart = 0.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -45,7 +45,7 @@ fun MessageLogItem(log: MessageLog) {
             ) {
                 Text(
                     text = log.senderName.ifBlank { log.senderPhone },
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = BrandTextPrimary,
                     modifier = Modifier.weight(1f)
                 )

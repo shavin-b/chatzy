@@ -46,7 +46,7 @@ fun RuleCard(
             .fillMaxWidth()
             .padding(vertical = 6.dp),
         colors = CardDefaults.cardColors(containerColor = BrandCardDark),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -57,7 +57,7 @@ fun RuleCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = rule.ruleName,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = BrandTextPrimary
                     )
                     Spacer(modifier = Modifier.height(2.dp))
@@ -72,7 +72,7 @@ fun RuleCard(
                     checked = rule.isActive,
                     onCheckedChange = onToggleActive,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = BrandTextPrimary,
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                         checkedTrackColor = BrandGreen
                     )
                 )
