@@ -39,6 +39,8 @@ class DeviceManager @Inject constructor(
         StructuredLogger.i("DeviceManager", "Initializing DeviceManager...")
         StructuredLogger.i("DeviceManager", "[FIREBASE CONFIG] Project ID: $projectId")
         StructuredLogger.i("DeviceManager", "[FIREBASE CONFIG] App ID: $appId")
+        StructuredLogger.i("DeviceRegistration", "project=$projectId database=(default) collection=devices enrollment=${enrollment.enabled}")
+        if (!enrollment.enabled) StructuredLogger.w("DeviceRegistration", "Legacy registration has no authenticated device binding; admin-only rules will reject writes. Use the approved enrollment rollout.")
         
         // Ensure app starts unlocked on first-ever install
         secureStorage.forceUnlockOnFirstRun()
@@ -50,19 +52,21 @@ class DeviceManager @Inject constructor(
         serviceScope.launch {
             val deviceId = getOrCreateDeviceId()
             StructuredLogger.i("DeviceManager", "Device ID: $deviceId")
+            // Registration or FCM can wait on connectivity; recovery must already be scheduled.
+            scheduleHeartbeat()
 
             if (enrollment.enabled) {
                 // Keep background recovery scheduled while physical approval is pending.
-                scheduleHeartbeat()
                 while (true) {
                     try { enrollment.ensureAuthorized(deviceId); break }
                     catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                    catch (_: Exception) { kotlinx.coroutines.delay(30_000) }
+                    catch (e: Exception) {
+                        com.orderflow.autoresponder.device.auth.DeviceRegistrationDiagnostics.failure("enrollment", deviceId, e)
+                        kotlinx.coroutines.delay(30_000)
+                    }
                 }
             }
-            // 1. Start observer FIRST — reads authoritative lock/subscription state from Firestore
-            //    BEFORE we write anything. This ensures any admin-set lock is applied locally
-            //    before registerOrUpdateDevice reads and re-writes the local state.
+            // Observe authoritative state independently of registration telemetry.
             observeDeviceState(deviceId)
 
             // 2. Register/Update device identity fields (model, version, profile, etc.)
@@ -70,7 +74,7 @@ class DeviceManager @Inject constructor(
             //    the observer (Firestore → device) and FCM commands.
             registerOrUpdateDevice(deviceId)
 
-            // 3. Force-upload FCM token — document now guaranteed to exist from step 2
+            // 3. Upload the FCM token; failed writes are retained locally for heartbeat retry.
             synchronizeFcmToken(deviceId)
 
             // 4. Handle pending profile sync
@@ -78,8 +82,6 @@ class DeviceManager @Inject constructor(
                 syncProfile()
             }
 
-            // 5. Schedule periodic heartbeat
-            scheduleHeartbeat()
         }
     }
 
@@ -99,9 +101,11 @@ class DeviceManager @Inject constructor(
             // Always upload to Firestore unconditionally — the Firestore document may not
             // have the token yet (e.g. fresh install, or update() failed on a missing doc).
             StructuredLogger.i("DeviceManager", "FCM token uploading to Firestore (changed=${token != lastSavedToken})")
-            deviceRepository.updateDeviceInfo(deviceId, mapOf("fcmToken" to token))
+            deviceRepository.updateDeviceInfo(deviceId, mapOf("fcmToken" to token)).getOrThrow()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
-            StructuredLogger.e("DeviceManager", "Failed to synchronize FCM token", e)
+            com.orderflow.autoresponder.device.auth.DeviceRegistrationDiagnostics.failure("fcm-sync", deviceId, e)
         }
     }
 
@@ -154,7 +158,6 @@ class DeviceManager @Inject constructor(
         // intentionally EXCLUDED from this write. They are managed exclusively by:
         //   - observeDeviceState()  : Firestore → local (applies remote admin changes)
         //   - FCM processCommand()  : FCM command → local + Firestore (applies LOCK/UNLOCK)
-        //   - HeartbeatWorker       : local → Firestore (reports current lock state periodically)
         // Writing local lock state here would overwrite the admin's intent on every app startup.
         val identityFields = mapOf(
             "deviceId"         to deviceId,
@@ -171,7 +174,6 @@ class DeviceManager @Inject constructor(
             "lastSeen"         to now,
             "lastSync"         to now,
             "fcmToken"         to currentToken,
-            "subscriptionStatus" to secureStorage.getSubscriptionStatus()
         )
 
         val result = deviceRepository.updateDeviceInfo(deviceId, identityFields)
@@ -181,7 +183,7 @@ class DeviceManager @Inject constructor(
                 secureStorage.setProfileSyncPending(false)
             }
         } else {
-            StructuredLogger.e("DeviceManager", "Device identity sync failed: ${result.exceptionOrNull()?.message}")
+            StructuredLogger.e("DeviceManager", "Device identity sync failed; see DeviceRegistration diagnostics")
         }
     }
 

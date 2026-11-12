@@ -22,7 +22,9 @@ android {
         // Explicit rollout switch; default keeps the working legacy path.
         buildConfigField("boolean", "DEVICE_ENROLLMENT_ENABLED", (providers.gradleProperty("chatzyDeviceEnrollment").orNull == "true").toString())
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = if (providers.gradleProperty("chatzySupportProbe").orNull == "true")
+            "com.orderflow.autoresponder.help.SupportProbeInstrumentation"
+        else "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -60,6 +62,8 @@ android {
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Help tests read the editable bundled JSON directly; rerun when it changes.
+        unitTests.all { it.inputs.file("src/main/res/raw/chatzy_help.json") }
     }
 }
 

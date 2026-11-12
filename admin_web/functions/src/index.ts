@@ -9,6 +9,7 @@
  */
 
 import * as admin from 'firebase-admin';
+export { chatzySupport } from './support';
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { v4 as uuidv4 } from 'uuid';
 import { canSendDeviceCommand } from './authorization';

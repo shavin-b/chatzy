@@ -1,5 +1,13 @@
 package com.orderflow.autoresponder.presentation.navigation
 
+import android.content.Intent
+import android.content.ActivityNotFoundException
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.orderflow.autoresponder.presentation.help.HelpAction
+import com.orderflow.autoresponder.presentation.help.HelpScreen
+import com.orderflow.autoresponder.presentation.help.HelpViewModel
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
@@ -44,6 +52,7 @@ object Screen {
     const val LOGS = "logs"
     const val CUSTOMERS = "customers"
     const val SETTINGS = "settings"
+    const val HELP = "help"
     const val DIAGNOSTICS = "diagnostics"
 }
 
@@ -53,6 +62,7 @@ fun NavGraph(
 ) {
     var editingRule by remember { mutableStateOf<AutoReplyRule?>(null) }
 
+    val context = LocalContext.current
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val tabs = listOf(
@@ -99,7 +109,7 @@ fun NavGraph(
                     onNavigateToLogs = { navigateToTab(Screen.LOGS) },
                     onNavigateToCustomers = { navigateToTab(Screen.CUSTOMERS) },
                     onNavigateToSettings = { navController.navigate(Screen.SETTINGS) },
-                    onNavigateToDiagnostics = { navController.navigate(Screen.DIAGNOSTICS) }
+                    onNavigateToHelp = { navController.navigate(Screen.HELP) }
                 )
             }
 
@@ -148,7 +158,32 @@ fun NavGraph(
                 val viewModel: SettingsViewModel = hiltViewModel()
                 SettingsScreen(
                     viewModel = viewModel,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToHelp = { navController.navigate(Screen.HELP) }
+                )
+            }
+
+            composable(Screen.HELP) {
+                val viewModel: HelpViewModel = hiltViewModel()
+                HelpScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onAction = { action ->
+                        when (action) {
+                            HelpAction.SERVICE_STATUS -> navController.navigate(Screen.DIAGNOSTICS)
+                            HelpAction.RULES -> navController.navigate(Screen.RULES_LIST)
+                            HelpAction.SETTINGS -> navController.navigate(Screen.SETTINGS)
+                            HelpAction.NOTIFICATION_ACCESS -> {
+                                try {
+                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                } catch (_: ActivityNotFoundException) {
+                                    Toast.makeText(context, "Open Android Settings and search for Notification Access.", Toast.LENGTH_LONG).show()
+                                } catch (_: SecurityException) {
+                                    Toast.makeText(context, "Open Android Settings and search for Notification Access.", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
                 )
             }
 

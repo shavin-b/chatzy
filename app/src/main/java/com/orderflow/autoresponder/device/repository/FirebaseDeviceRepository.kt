@@ -18,30 +18,22 @@ class FirebaseDeviceRepository @Inject constructor(
 ) : DeviceRepository {
 
     override suspend fun registerDevice(deviceInfo: DeviceInfo): Result<Unit> {
-        if (enrollment.enabled) return updateDeviceInfo(deviceInfo.deviceId, mapOf(
+        // Never serialize DeviceInfo defaults over admin subscription/activation/lock fields.
+        return updateDeviceInfo(deviceInfo.deviceId, mapOf(
+            "deviceId" to deviceInfo.deviceId, "generatedUuid" to deviceInfo.deviceId,
             "phoneModel" to deviceInfo.phoneModel, "manufacturer" to deviceInfo.manufacturer,
             "androidVersion" to deviceInfo.androidVersion, "appVersion" to deviceInfo.appVersion,
             "appBuildNumber" to deviceInfo.appBuildNumber, "userName" to deviceInfo.userName,
             "businessName" to deviceInfo.businessName, "phoneNumber" to deviceInfo.phoneNumber,
             "lastSeen" to System.currentTimeMillis(), "lastSync" to System.currentTimeMillis(), "fcmToken" to deviceInfo.fcmToken))
-        return try {
-            firestore.collection("devices")
-                .document(deviceInfo.deviceId)
-                .set(deviceInfo, SetOptions.merge())
-                .await()
-            Result.success(Unit)
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
     }
 
     override suspend fun updateDeviceInfo(deviceId: String, updates: Map<String, Any>): Result<Unit> {
         return try {
+            val timestamped = com.orderflow.autoresponder.device.auth.DeviceWritePolicy.serverLastSeen(updates)
             if (enrollment.enabled) {
                 enrollment.ensureAuthorized(deviceId)
-                val telemetry = com.orderflow.autoresponder.device.auth.DeviceWritePolicy.telemetryOnly(updates)
+                val telemetry = com.orderflow.autoresponder.device.auth.DeviceWritePolicy.telemetryOnly(timestamped)
                 if (telemetry.isNotEmpty()) firestore.collection("devices").document(deviceId).update(telemetry).await()
                 return Result.success(Unit)
             }
@@ -50,12 +42,13 @@ class FirebaseDeviceRepository @Inject constructor(
             // update() throws "NOT_FOUND" on missing docs; set+merge creates or patches safely.
             firestore.collection("devices")
                 .document(deviceId)
-                .set(updates, SetOptions.merge())
+                .set(timestamped, SetOptions.merge())
                 .await()
             Result.success(Unit)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (e: Exception) {
+            com.orderflow.autoresponder.device.auth.DeviceRegistrationDiagnostics.failure("write", deviceId, e)
             Result.failure(e)
         }
     }
@@ -124,6 +117,7 @@ class FirebaseDeviceRepository @Inject constructor(
             .document(deviceId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    com.orderflow.autoresponder.device.auth.DeviceRegistrationDiagnostics.failure("observe", deviceId, error)
                     // Do not close the channel on transient network glitches (e.g. UNAVAILABLE, UnknownHostException).
                     // Firestore auto-retries with backoff. Closing the channel would permanently kill this listener.
                     return@addSnapshotListener
@@ -143,6 +137,7 @@ class FirebaseDeviceRepository @Inject constructor(
             .document(deviceId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    com.orderflow.autoresponder.device.auth.DeviceRegistrationDiagnostics.failure("observe", deviceId, error)
                     // Do not close the channel on transient network glitches (e.g. UNAVAILABLE, UnknownHostException).
                     // Firestore auto-retries with backoff. Closing the channel would permanently kill this listener.
                     return@addSnapshotListener

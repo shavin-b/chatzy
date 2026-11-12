@@ -9,7 +9,9 @@
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "node --test scripts/*.test.cjs"
+    "test": "node --test scripts/*.test.cjs",
+    "support:check": "node scripts/deploy-support.cjs",
+    "deploy:support": "node scripts/deploy-support.cjs --deploy"
   },
   "engines": {
     "node": "20"

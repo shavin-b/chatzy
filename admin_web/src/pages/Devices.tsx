@@ -127,7 +127,7 @@ export function DevicesPage() {
         <div>
           <h1 className="text-xl font-bold text-white">Devices</h1>
           <p className="text-sm text-slate-500">
-            {loading ? 'Loading…' : `${devices.length} device${devices.length !== 1 ? 's' : ''} registered`}
+            {loading ? 'Loading…' : error ? 'Device count unavailable' : `${devices.length} device${devices.length !== 1 ? 's' : ''} registered`}
           </p>
         </div>
       </div>
@@ -203,7 +203,7 @@ export function DevicesPage() {
               <div key={i} className="h-12 skeleton rounded-xl" />
             ))}
           </div>
-        ) : paginated.length === 0 ? (
+        ) : error ? null : paginated.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <Smartphone className="h-12 w-12 text-slate-800" />
             {search || statusFilter !== 'all' ? (

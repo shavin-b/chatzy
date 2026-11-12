@@ -84,7 +84,8 @@ import com.orderflow.autoresponder.presentation.theme.StatusSuccess
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToHelp: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -116,6 +117,11 @@ fun SettingsScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            OutlinedButton(onClick = onNavigateToHelp, modifier = Modifier.fillMaxWidth()) {
+                Text("Chatzy Help")
+            }
+            Text("Offline answers and troubleshooting", color = BrandTextSecondary, style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(16.dp))
             DeviceEnrollmentPanel()
             Text(
                 text = "Background Reliability & Setup",

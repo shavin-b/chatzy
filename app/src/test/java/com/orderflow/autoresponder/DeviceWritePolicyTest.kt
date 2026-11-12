@@ -5,6 +5,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DeviceWritePolicyTest {
+    @Test fun registrationAndHeartbeatUseServerTimestampWithoutChangingInputOrAdminFields() {
+        val input = mapOf<String, Any>("lastSeen" to 123L, "lastSync" to 456L,
+            "subscriptionStatus" to "SUSPENDED", "adminLocked" to true)
+        val payload = DeviceWritePolicy.telemetryOnly(DeviceWritePolicy.serverLastSeen(input))
+        assertEquals(com.google.firebase.firestore.FieldValue.serverTimestamp(), payload["lastSeen"])
+        assertEquals(456L, payload["lastSync"])
+        assertEquals(setOf("lastSeen", "lastSync"), payload.keys)
+        assertEquals(123L, input["lastSeen"])
+    }
+    @Test fun fcmAndProfileUpdatesDoNotInventPresence() {
+        val input = mapOf<String, Any>("fcmToken" to "test-only-token", "businessName" to "Shop")
+        assertEquals(input, DeviceWritePolicy.serverLastSeen(input))
+    }
     @Test fun telemetrySurvivesButAuthorityAndIdentityNeverLeaveTheDevice() {
         val input = mapOf<String, Any>("lastSeen" to 123L, "fcmToken" to "test-only-token", "businessName" to "Shop",
             "adminLocked" to false, "lockStatus" to "UNLOCKED", "lockReason" to "NONE", "subscriptionEnd" to 999L,

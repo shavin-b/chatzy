@@ -37,3 +37,14 @@ test('preflight remains supported for the configured admin origin',async()=>{
   const result=await worker.fetch(new Request('https://unit-test.invalid/api/device-command',{method:'OPTIONS',headers:{Origin:'http://localhost:5173'}}),bindings,{});
   assert.equal(result.status,204);assert.equal(result.headers.get('Access-Control-Allow-Origin'),'http://localhost:5173');
 });
+test('Chatzy deployment matches the Android project and accepts the live dashboard origin',async()=>{
+  const fs=require('node:fs');
+  const config=JSON.parse(fs.readFileSync('wrangler.chatzy.jsonc','utf8'));
+  const android=JSON.parse(fs.readFileSync('../../app/google-services.json','utf8'));
+  assert.equal(config.vars.FIREBASE_PROJECT_ID,android.project_info.project_id);
+  const origin='https://chatzy-admin-console.vercel.app';
+  assert.ok(config.vars.ALLOWED_ORIGINS.split(',').includes(origin));
+  const result=await worker.fetch(new Request('https://unit-test.invalid/api/device-command',{method:'OPTIONS',headers:{Origin:origin}}),{...bindings,...config.vars},{});
+  assert.equal(result.status,204);
+  assert.equal(result.headers.get('Access-Control-Allow-Origin'),origin);
+});

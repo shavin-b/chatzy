@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Firestore } from 'firebase-admin/firestore';
+import { FieldValue, Firestore } from 'firebase-admin/firestore';
 import { Auth } from 'firebase-admin/auth';
 import { HttpsError } from 'firebase-functions/v2/https';
 
@@ -10,6 +10,9 @@ function validId(id: unknown): asserts id is string {
 }
 function installation(caller: EnrollmentCaller): void {
   if (!caller.uid || !caller.anonymous) throw new HttpsError('permission-denied', 'Use a dedicated anonymous installation identity.');
+}
+function newDevice(deviceId: string): Record<string, unknown> {
+  return {deviceId, generatedUuid: deviceId, firstSeen: Date.now(), subscriptionStatus: 'SUSPENDED', status: 'Suspended', subscriptionEnd: null, adminLocked: false, lockStatus: 'UNLOCKED', lockReason: 'NONE'};
 }
 export class DeviceEnrollmentService {
   constructor(private db: Firestore, private auth: Auth) {}
@@ -49,14 +52,24 @@ export class DeviceEnrollmentService {
       tx.set(bindingRef, {authUid: request.authUid, deviceId: request.deviceId, active: true, approvedBy: adminUid, approvedAt: Date.now()});
       tx.update(uidRef, {state: 'APPROVED'}); tx.update(requestRef, {state: 'APPROVED', approvedBy: adminUid});
       // Existing records are NEVER merged with defaults: subscription/lock/history survive.
-      if (!device.exists) tx.create(deviceRef, {deviceId: request.deviceId, generatedUuid: request.deviceId, firstSeen: Date.now(), subscriptionStatus: 'SUSPENDED', status: 'Suspended', subscriptionEnd: null, adminLocked: false, lockStatus: 'UNLOCKED', lockReason: 'NONE'});
+      if (!device.exists) tx.create(deviceRef, newDevice(request.deviceId));
       return {state: 'APPROVED', deviceId: request.deviceId};
     });
   }
   async complete(caller: EnrollmentCaller, deviceId: unknown): Promise<Record<string, unknown>> {
     installation(caller); validId(deviceId);
-    const [binding, enrollment] = await Promise.all([this.db.doc(`deviceBindings/${deviceId}`).get(), this.db.doc(`deviceEnrollments/${caller.uid}`).get()]);
-    if (binding.data()?.authUid !== caller.uid || binding.data()?.active !== true || enrollment.data()?.state !== 'APPROVED' || enrollment.data()?.deviceId !== deviceId) throw new HttpsError('failed-precondition', 'Physical-device approval required.');
+    // Completion is the authenticated registration point. A provisioned record without
+    // lastSeen is invisible to the console's orderBy(lastSeen) query until this commits.
+    await this.db.runTransaction(async tx => {
+      const deviceRef = this.db.doc(`devices/${deviceId}`);
+      const [binding, enrollment, device] = await Promise.all([
+        tx.get(this.db.doc(`deviceBindings/${deviceId}`)),
+        tx.get(this.db.doc(`deviceEnrollments/${caller.uid}`)), tx.get(deviceRef)
+      ]);
+      if (binding.data()?.authUid !== caller.uid || binding.data()?.active !== true || enrollment.data()?.state !== 'APPROVED' || enrollment.data()?.deviceId !== deviceId) throw new HttpsError('failed-precondition', 'Physical-device approval required.');
+      if (device.exists) tx.update(deviceRef, {lastSeen: FieldValue.serverTimestamp()});
+      else tx.create(deviceRef, {...newDevice(deviceId), lastSeen: FieldValue.serverTimestamp()});
+    });
     const user = await this.auth.getUser(caller.uid);
     await this.auth.setCustomUserClaims(caller.uid, {...user.customClaims, device_id: deviceId});
     // Rules ALSO check the live binding, so revocation during issuance cannot restore access.

@@ -33,7 +33,14 @@ class DeviceEnrollment @Inject constructor(
     suspend fun request(deviceId: String) = mutex.withLock {
         check(enabled) { "Secure enrollment is not enabled in this build." }
         installation()
-        val result = functions.getHttpsCallable("requestDeviceEnrollment").call(mapOf("deviceId" to deviceId)).await().data as? Map<*, *>
+        val result = try {
+            functions.getHttpsCallable("requestDeviceEnrollment").call(mapOf("deviceId" to deviceId)).await().data as? Map<*, *>
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            DeviceRegistrationDiagnostics.failure("request-enrollment", deviceId, e)
+            throw e
+        }
         // Pairing request ID is for physical comparison, never an Auth token or credential.
         mutableStatus.value = "Device: $deviceId\nPairing ID: ${result?.get("requestId")}\nShow this screen to your Super Admin. Then check approval."
     }

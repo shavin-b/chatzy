@@ -7,6 +7,8 @@ functions/lib/
 .env.local
 .env.production
 functions/.env
+functions/.env.*
+!functions/.env.example
 functions/service-account.json
 
 # Build outputs

@@ -74,6 +74,43 @@ test('new device is provisioned suspended without resetting existing ID format',
   const pending=await service.request(anon(a),'OF-NEW');await service.approve('root',pending.requestId);
   const device=(await db.doc('devices/OF-NEW').get()).data();assert.equal(device.deviceId,'OF-NEW');assert.equal(device.subscriptionStatus,'SUSPENDED');assert.equal(device.subscriptionEnd,null);
 });
+
+test('completion makes a new approved device visible to the dashboard query with a server Timestamp',async()=>{
+  const pending=await service.request(anon(a),'OF-NEW');await service.approve('root',pending.requestId);
+  assert.equal((await db.collection('devices').orderBy('lastSeen','desc').get()).size,0);
+  await service.complete(anon(a),'OF-NEW');
+  const visible=await db.collection('devices').orderBy('lastSeen','desc').get();
+  assert.deepEqual(visible.docs.map(doc=>doc.id),['OF-NEW']);
+  assert.ok(visible.docs[0].data().lastSeen instanceof Timestamp);
+  assert.equal(visible.docs[0].data().subscriptionStatus,'SUSPENDED');
+});
+
+test('dashboard query excludes missing lastSeen but includes both numeric and Timestamp values',async()=>{
+  await db.doc('devices/OF-NUMERIC').set({lastSeen:12345});
+  await db.doc('devices/OF-TIMESTAMP').set({lastSeen:Timestamp.fromMillis(12345)});
+  assert.equal((await db.doc('devices/OF-EXISTING').get()).exists,true);
+  const visible=await db.collection('devices').orderBy('lastSeen','desc').get();
+  assert.deepEqual(new Set(visible.docs.map(doc=>doc.id)),new Set(['OF-NUMERIC','OF-TIMESTAMP']));
+  const all=await db.collection('devices').get();
+  assert.deepEqual(new Set(all.docs.map(doc=>doc.id)),new Set(['OF-EXISTING','OF-NUMERIC','OF-TIMESTAMP']));
+});
+
+test('completion retries preserve all existing authority fields and the same device ID',async()=>{
+  const ref=db.doc('devices/OF-EXISTING');
+  await ref.update({activationDate:123,lockReason:'ADMIN',status:'Suspended'});
+  const original=(await ref.get()).data();const pending=await request();await service.approve('root',pending.requestId);
+  await service.complete(anon(a),'OF-EXISTING');const first=(await ref.get()).data().lastSeen;
+  await service.complete(anon(a),'OF-EXISTING');const after=(await ref.get()).data();
+  assert.ok(after.lastSeen instanceof Timestamp);assert.ok(after.lastSeen.toMillis()>=first.toMillis());
+  const {lastSeen,...preserved}=after;assert.deepEqual(preserved,original);
+  assert.deepEqual((await db.collection('devices').get()).docs.map(doc=>doc.id),['OF-EXISTING']);
+});
+
+test('an unapproved installation cannot create dashboard presence',async()=>{
+  await service.request(anon(a),'OF-NEW');
+  await rejectsCode(service.complete(anon(a),'OF-NEW'),'failed-precondition');
+  assert.equal((await db.doc('devices/OF-NEW').get()).exists,false);
+});
 test('enrollment rejects non-installation callers and invalid document paths',async()=>{
   await rejectsCode(service.request({uid:a,anonymous:false},'OF-EXISTING'),'permission-denied');
   await rejectsCode(service.request(anon(a),'OF-A/subcollection/evil'),'invalid-argument');
@@ -112,7 +149,13 @@ test('real anonymous Auth token gains only approved scoped Firestore access and 
     const approved=await user.getIdTokenResult(true);assert.equal(approved.claims.device_id,'OF-EXISTING');
     const ref=sdkFirestore.doc(store,'devices','OF-EXISTING');
     assert.equal((await sdkFirestore.getDocFromServer(ref)).data().customLegacyField,'preserve-me');
-    await sdkFirestore.updateDoc(ref,{lastSeen:123,lastSync:123});
+    const authority=(await sdkFirestore.getDocFromServer(ref)).data();
+    await sdkFirestore.updateDoc(ref,{lastSeen:sdkFirestore.serverTimestamp(),lastSync:123});
+    const heartbeat=(await sdkFirestore.getDocFromServer(ref)).data();
+    assert.equal(typeof heartbeat.lastSeen.toMillis(),'number');
+    assert.ok(heartbeat.lastSeen.toMillis()>=authority.lastSeen.toMillis());
+    for(const key of ['subscriptionStatus','adminLocked','customLegacyField'])assert.deepEqual(heartbeat[key],authority[key]);
+    assert.equal(heartbeat.subscriptionEnd.toMillis(),authority.subscriptionEnd.toMillis());
     await assert.rejects(sdkFirestore.updateDoc(ref,{subscriptionEnd:999}),e=>e.code==='permission-denied');
     await assert.rejects(sdkFirestore.updateDoc(ref,{adminLocked:false}),e=>e.code==='permission-denied');
     await db.doc('deviceBindings/OF-EXISTING').update({active:false});

@@ -24,17 +24,13 @@ class HeartbeatWorker @AssistedInject constructor(
 
         val deviceId = secureStorage.getDeviceId() ?: return Result.success()
 
-        // Include lock state in every heartbeat so the admin dashboard stays consistent
-        // even after device reboots or missed FCM acknowledgements.
+        // Heartbeats report presence, never overwrite administrator lock/subscription state.
         val now = System.currentTimeMillis()
         val fcmToken = secureStorage.getFcmToken() ?: ""
 
         val updates = mutableMapOf<String, Any>(
             "lastSeen"    to now,
-            "lastSync"    to now,
-            "adminLocked" to secureStorage.isAdminLocked(),
-            "lockStatus"  to if (secureStorage.isAdminLocked()) "LOCKED" else "UNLOCKED",
-            "lockReason"  to secureStorage.getLockReason()
+            "lastSync"    to now
         )
 
         // Self-heal: include FCM token in every heartbeat so the admin console
@@ -46,7 +42,10 @@ class HeartbeatWorker @AssistedInject constructor(
         return try {
             val result = deviceRepository.updateDeviceInfo(deviceId, updates)
             if (result.isSuccess) Result.success() else Result.retry()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
+            com.orderflow.autoresponder.device.auth.DeviceRegistrationDiagnostics.failure("heartbeat", deviceId, e)
             Result.retry()
         }
     }

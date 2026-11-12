@@ -5,8 +5,6 @@ import {
   collection,
   doc,
   onSnapshot,
-  query,
-  orderBy,
   updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -74,10 +72,10 @@ export function subscribeToDevices(
   onError: (error: Error) => void,
   onlineThresholdMs: number = DEFAULT_ONLINE_THRESHOLD_MS
 ): Unsubscribe {
-  const q = query(collection(db, 'devices'), orderBy('lastSeen', 'desc'));
-  
+  // Server orderBy excludes legacy/provisioned documents with no lastSeen.
+  // Include them as offline/never-seen and sort normalized times locally.
   return onSnapshot(
-    q,
+    collection(db, 'devices'),
     (snapshot) => {
       if (snapshot.empty) {
         onData([]);
@@ -86,6 +84,7 @@ export function subscribeToDevices(
       const devices = snapshot.docs.map((docSnap) =>
         normalizeDevice(docSnap.data(), docSnap.id, onlineThresholdMs)
       );
+      devices.sort((a, b) => (b.lastSeen ?? -Infinity) - (a.lastSeen ?? -Infinity) || a.deviceId.localeCompare(b.deviceId));
       onData(devices);
     },
     (error) => {

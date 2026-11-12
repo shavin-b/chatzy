@@ -34,7 +34,7 @@ fun DashboardScreen(
     onNavigateToLogs: () -> Unit,
     onNavigateToCustomers: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToDiagnostics: () -> Unit,
+    onNavigateToHelp: () -> Unit,
     rulesViewModel: RulesViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -48,8 +48,8 @@ fun DashboardScreen(
                 title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold,
                     color = colors.primary, style = MaterialTheme.typography.headlineMedium) },
                 actions = {
-                    IconButton(onClick = onNavigateToDiagnostics) {
-                        Icon(Icons.Default.Info, "Diagnostics & status")
+                    IconButton(onClick = onNavigateToHelp) {
+                        Icon(Icons.Default.Info, "Chatzy Help")
                     }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, "Settings")

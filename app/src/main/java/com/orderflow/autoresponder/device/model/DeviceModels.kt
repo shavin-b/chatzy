@@ -11,7 +11,8 @@ data class DeviceInfo(
     val userName: String = "",
     val businessName: String = "",
     val firstSeen: Long? = null,
-    val lastSeen: Long? = null,
+    // Existing documents may contain epoch milliseconds; new writes use Firestore Timestamp.
+    val lastSeen: Any? = null,
     val lastSync: Long? = null,
     val status: String = "Active", // Overall status
     val lockStatus: String = "UNLOCKED",

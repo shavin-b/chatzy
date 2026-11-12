@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { SubscriptionRecord, LogEntry } from '../types';
-import { updateDeviceSubscription } from './devices';
+import { updateDeviceSubscription, updateDeviceStatus } from './devices';
 
 // ---------------------------------------------------------------
 // Normalize subscription record
@@ -121,11 +121,12 @@ export async function setSubscriptionStatus(params: {
   businessName: string;
   status: 'Active' | 'Suspended';
   adminEmail: string;
+  currentExpiryMs: number | null;
 }): Promise<void> {
-  const { deviceId, businessName, status, adminEmail } = params;
+  const { deviceId, businessName, status, adminEmail, currentExpiryMs } = params;
   const now = Date.now();
 
-  await updateDeviceSubscription(deviceId, 0, status);
+  await updateDeviceStatus(deviceId, status);
 
   const subRecord: SubscriptionRecord = {
     subscriptionId: `sub_${deviceId}_${now}`,
@@ -133,8 +134,8 @@ export async function setSubscriptionStatus(params: {
     businessName,
     updatedBy: adminEmail,
     updatedAt: now,
-    oldExpiryDate: 0,
-    newExpiryDate: 0,
+    oldExpiryDate: currentExpiryMs ?? 0,
+    newExpiryDate: currentExpiryMs ?? 0,
     daysAdded: 0,
     actionType: status === 'Suspended' ? 'Suspend' : 'Activate',
   };

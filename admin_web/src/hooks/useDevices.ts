@@ -24,8 +24,14 @@ export function useDevices(onlineThresholdMs: number = DEFAULT_ONLINE_THRESHOLD_
         setError(null);
       },
       (err) => {
-        console.error('[useDevices]', err);
-        setError('Unable to load device data.');
+        const code = (err as Error & {code?: string}).code ?? 'unknown';
+        console.error('[useDevices]', {code});
+        setDevices([]);
+        setError(code === 'permission-denied'
+          ? 'Device list access denied. Check the signed-in admin role and Firestore device-read permissions.'
+          : code === 'unavailable'
+            ? 'Cannot reach the device database. Check your connection and retry.'
+            : 'Unable to load device data. Retry or contact your administrator.');
         setLoading(false);
       },
       onlineThresholdMs

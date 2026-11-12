@@ -75,10 +75,10 @@ export function SubscriptionsPage() {
         });
         toast({ type: 'success', title: `Subscription extended by +${days} days.` });
       } else if (type === 'activate') {
-        await setSubscriptionStatus({ deviceId: device.deviceId, businessName: device.businessName || device.userName, status: 'Active', adminEmail: admin.email });
+        await setSubscriptionStatus({ deviceId: device.deviceId, businessName: device.businessName || device.userName, status: 'Active', adminEmail: admin.email, currentExpiryMs: device.subscriptionEnd });
         toast({ type: 'success', title: 'Device subscription activated.' });
       } else if (type === 'suspend') {
-        await setSubscriptionStatus({ deviceId: device.deviceId, businessName: device.businessName || device.userName, status: 'Suspended', adminEmail: admin.email });
+        await setSubscriptionStatus({ deviceId: device.deviceId, businessName: device.businessName || device.userName, status: 'Suspended', adminEmail: admin.email, currentExpiryMs: device.subscriptionEnd });
         toast({ type: 'warning', title: 'Device subscription suspended.' });
       }
       setConfirmAction(null);

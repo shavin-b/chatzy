@@ -46,6 +46,11 @@ test('ordinary authenticated users cannot read admin-sensitive data or list admi
   for(const [c,id] of [['admins','root'],['devices','OF-A'],['deviceCommands','cmd'],['settings','global'],['logs','existing'],['subscriptions','sub'],['notifications','notice']]) await assertFails(getDoc(doc(db,c,id)));
   await assertFails(getDocs(collection(db,'admins')));
 });
+
+test('sign-in without an approved device binding cannot create dashboard presence',async()=>{
+  const db=dbFor('new-installation');
+  await assertFails(setDoc(doc(db,'devices','OF-NEW'),{deviceId:'OF-NEW',lastSeen:Date.now()}));
+});
 test('ordinary users cannot bootstrap themselves or someone else as admin',async()=>{
   const db=dbFor('ordinary');
   await assertFails(setDoc(doc(db,'admins','ordinary'),profile('ordinary','Super Admin')));

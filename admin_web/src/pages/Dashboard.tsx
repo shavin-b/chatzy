@@ -64,13 +64,13 @@ export function DashboardPage() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-        <StatCard label="Total Devices" value={stats.totalDevices} icon={Smartphone} iconColor="text-slate-400" loading={loading} />
-        <StatCard label="Online" value={stats.onlineDevices} icon={Wifi} iconColor="text-teal-400" loading={loading} />
-        <StatCard label="Offline" value={stats.offlineDevices} icon={WifiOff} iconColor="text-slate-500" loading={loading} />
-        <StatCard label="Active" value={stats.activeSubscriptions} icon={CreditCard} iconColor="text-emerald-400" loading={loading} />
-        <StatCard label="Expiring Soon" value={stats.expiringSoon} icon={Clock} iconColor="text-amber-400" loading={loading} />
-        <StatCard label="Expired" value={stats.expired} icon={XCircle} iconColor="text-red-400" loading={loading} />
-        <StatCard label="Suspended" value={stats.suspended} icon={AlertOctagon} iconColor="text-orange-400" loading={loading} />
+        <StatCard label="Total Devices" value={error ? "Unavailable" : stats.totalDevices} icon={Smartphone} iconColor="text-slate-400" loading={loading} />
+        <StatCard label="Online" value={error ? "Unavailable" : stats.onlineDevices} icon={Wifi} iconColor="text-teal-400" loading={loading} />
+        <StatCard label="Offline" value={error ? "Unavailable" : stats.offlineDevices} icon={WifiOff} iconColor="text-slate-500" loading={loading} />
+        <StatCard label="Active" value={error ? "Unavailable" : stats.activeSubscriptions} icon={CreditCard} iconColor="text-emerald-400" loading={loading} />
+        <StatCard label="Expiring Soon" value={error ? "Unavailable" : stats.expiringSoon} icon={Clock} iconColor="text-amber-400" loading={loading} />
+        <StatCard label="Expired" value={error ? "Unavailable" : stats.expired} icon={XCircle} iconColor="text-red-400" loading={loading} />
+        <StatCard label="Suspended" value={error ? "Unavailable" : stats.suspended} icon={AlertOctagon} iconColor="text-orange-400" loading={loading} />
       </div>
 
       {/* Recent Devices */}
@@ -88,7 +88,7 @@ export function DashboardPage() {
               <div key={i} className="h-10 skeleton rounded-lg" />
             ))}
           </div>
-        ) : devices.length === 0 ? (
+        ) : error ? null : devices.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <Smartphone className="h-10 w-10 text-slate-700" />
             <p className="text-sm font-medium text-slate-500">No devices registered yet.</p>

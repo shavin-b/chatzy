@@ -25,8 +25,12 @@ export function useDeviceCommand(): UseDeviceCommandReturn {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const inFlightRef = useRef(false);
+  const generationRef = useRef(0);
 
   function cleanup() {
+    generationRef.current += 1;
+    inFlightRef.current = false;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (unsubRef.current) unsubRef.current();
     timeoutRef.current = null;
@@ -38,35 +42,48 @@ export function useDeviceCommand(): UseDeviceCommandReturn {
   }, []);
 
   async function issueCommand(deviceId: string, command: CommandType): Promise<void> {
+    if (inFlightRef.current) return;
     if (!user || !admin) {
       setErrorMessage('Not authenticated');
       return;
     }
 
     cleanup();
+    const generation = generationRef.current;
+    inFlightRef.current = true;
     setErrorMessage(null);
     setUiState('pending');
 
     try {
       // Call Cloud Function (server-side FCM send)
       const result = await sendDeviceCommand(deviceId, command);
+      if (generation !== generationRef.current) return;
       const commandId = result.commandId;
 
       setUiState('sent');
 
       // Write audit log
       await writeAuditLog({
-        title: `Device ${command === 'LOCK' ? 'Locked' : 'Unlocked'}`,
+        title: `Device ${command === 'LOCK' ? 'Locked' : command === 'UNLOCK' ? 'Unlocked' : 'Synced'}`,
         description: `Admin issued ${command} command to device ${deviceId}.`,
         category: 'Command',
         performedBy: admin.email,
         deviceId,
       });
+      if (generation !== generationRef.current) return;
+
+      // Terminal acknowledgements cancel this timer. Do not read render-captured uiState here.
+      timeoutRef.current = setTimeout(() => {
+        if (generation !== generationRef.current) return;
+        setUiState('offline_queued');
+        cleanup();
+      }, COMMAND_TIMEOUT_MS);
 
       // Subscribe to command acknowledgement
-      unsubRef.current = subscribeToCommand(
+      const unsubscribe = subscribeToCommand(
         commandId,
         (cmd) => {
+          if (generation !== generationRef.current) return;
           if (!cmd) return;
           setLastCommand(cmd);
           if (cmd.status === 'SUCCESS') {
@@ -79,20 +96,18 @@ export function useDeviceCommand(): UseDeviceCommandReturn {
           }
         },
         (_err) => {
+          if (generation !== generationRef.current) return;
           setUiState('failed');
           setErrorMessage('Failed to track command status');
           cleanup();
         }
       );
-
-      // Timeout if device doesn't respond
-      timeoutRef.current = setTimeout(() => {
-        if (uiState === 'sent') {
-          setUiState('offline_queued');
-          cleanup();
-        }
-      }, COMMAND_TIMEOUT_MS);
+      // A cached terminal snapshot may arrive before subscribeToCommand returns.
+      if (generation === generationRef.current) unsubRef.current = unsubscribe;
+      else unsubscribe();
     } catch (err: unknown) {
+      if (generation !== generationRef.current) return;
+      cleanup();
       const errorObj = err as { code?: string; message?: string };
       const code = errorObj.code ?? '';
       const msg = errorObj.message ?? 'Unknown error';

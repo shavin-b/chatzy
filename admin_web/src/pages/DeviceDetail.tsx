@@ -91,7 +91,7 @@ export function DeviceDetailPage() {
         description: 'The command will be processed when the device reconnects.',
       });
     }
-  }, [uiState]);
+  }, [uiState, pendingCommand, toast, cmdError]);
 
   function openConfirm(cmd: CommandType) {
     resetState();

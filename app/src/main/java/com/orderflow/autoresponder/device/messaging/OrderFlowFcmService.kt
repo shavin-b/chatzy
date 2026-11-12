@@ -48,10 +48,12 @@ class OrderFlowFcmService : FirebaseMessagingService() {
         serviceScope.launch {
             try {
                 // Force-write directly — bypass the equality check in synchronizeFcmToken
-                deviceRepository.updateDeviceInfo(deviceId, mapOf("fcmToken" to token))
+                deviceRepository.updateDeviceInfo(deviceId, mapOf("fcmToken" to token)).getOrThrow()
                 StructuredLogger.i("OrderFlowFcmService", "New FCM token uploaded to Firestore successfully")
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
-                StructuredLogger.e("OrderFlowFcmService", "Direct token upload failed, falling back to synchronizeFcmToken", e)
+                com.orderflow.autoresponder.device.auth.DeviceRegistrationDiagnostics.failure("fcm-refresh", deviceId, e)
                 deviceManager.synchronizeFcmToken(deviceId)
             }
         }

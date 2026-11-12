@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:connection": "node scripts/check-connection.mjs",
+    "test:connection": "node --test scripts/check-connection.test.mjs",
+    "test": "node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
